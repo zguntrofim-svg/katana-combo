@@ -22,6 +22,7 @@ public final class ComboClient implements ClientModInitializer {
     public static final int RECOVERY_TICKS = 7;
     private static final String[] NAMES = {"horizontal", "reverse_diagonal", "overhead", "jump_counter"};
     @Override public void onInitializeClient() {
+        KatanaModel.init();
         DefenseClient.init();
         ClientPlayNetworking.registerGlobalReceiver(ComboPackets.State.ID, (state, context) -> {
             if (state.step() >= 0 && state.step() < ComboTiming.DURATION.length) STATES.put(state.player(), state);
