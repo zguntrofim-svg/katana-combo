@@ -47,7 +47,9 @@ public final class KatanaDefense {
                 g.weapon=stack;g.dimension=world.getRegistryKey();
                 publish(server,g,1);
             }
-            return TypedActionResult.consume(stack);
+            // Fabric's client UseItemCallback sends the interaction packet only for SUCCESS.
+            // CONSUME would predict the pose locally while leaving the server unaware of the guard.
+            return world.isClient?TypedActionResult.success(stack):TypedActionResult.consume(stack);
         });
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity,source,amount)->{
             if(entity instanceof ServerPlayerEntity p && amount>0 && canBlock(p,source)){
