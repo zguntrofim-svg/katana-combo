@@ -63,10 +63,11 @@ public final class ComboAnimation {
         int duration=ComboTiming.DURATION[step];
         if (age >= duration+ComboClient.RECOVERY_TICKS) return null;
         float frameAge=Math.min(age,duration-0.05f);
-        float[] times = {0, ComboTiming.HIT_START[step]-1, ComboTiming.HIT_START[step]+0.75f,
-            ComboTiming.HIT_END[step]+2, duration};
+        float[] times = step==3?new float[]{0,2,4.5f,6,8.25f,10.5f,duration}
+            :new float[]{0,ComboTiming.HIT_START[step]-1,ComboTiming.HIT_START[step]+0.75f,ComboTiming.HIT_END[step]+2,duration};
+        int last=times.length-1;
         int segment = 0;
-        while (segment < 3 && frameAge > times[segment+1]) segment++;
+        while (segment < last-1 && frameAge > times[segment+1]) segment++;
         float span=times[segment+1]-times[segment];
         float t=MathHelper.clamp((frameAge-times[segment])/span,0,1);
         float[] v=new float[13], velocity=new float[13];
@@ -74,7 +75,7 @@ public final class ComboAnimation {
         for(int i=0;i<v.length;i++){
             float a=FRAMES[step][segment][i],b=FRAMES[step][segment+1][i];
             float m0=segment==0?0:(b-FRAMES[step][segment-1][i])/(times[segment+1]-times[segment-1]);
-            float m1=segment==3?0:(FRAMES[step][segment+2][i]-a)/(times[segment+2]-times[segment]);
+            float m1=segment==last-1?0:(FRAMES[step][segment+2][i]-a)/(times[segment+2]-times[segment]);
             v[i]=(2*t*t*t-3*t*t+1)*a+(t*t*t-2*t*t+t)*span*m0+(-2*t*t*t+3*t*t)*b+(t*t*t-t*t)*span*m1;
             velocity[i]=((6*t*t-6*t)*a+(3*t*t-4*t+1)*span*m0+(-6*t*t+6*t)*b+(3*t*t-2*t)*span*m1)/span;
         }

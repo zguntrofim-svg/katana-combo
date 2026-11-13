@@ -1,63 +1,81 @@
 package dev.animerpg.combo;
 
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderPhase;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
 import java.util.List;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.*;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.util.Arm;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-/** Analytically sampled blade ribbon: soft cyan fill, narrow white edge, fading over four ticks. */
+/** A single connected, feathered ribbon following the blade tip; no overlapping hard-edged strips. */
 public final class SlashTrail {
     private static final class TrailLayer extends RenderLayer {
-        private static final List<RenderPhase> PHASES=List.of(LIGHTNING_PROGRAM,LIGHTNING_TRANSPARENCY,
+        private static final List<RenderPhase> PHASES=List.of(LIGHTNING_PROGRAM,TRANSLUCENT_TRANSPARENCY,
             LEQUAL_DEPTH_TEST,DISABLE_CULLING,COLOR_MASK);
         private static final RenderLayer INSTANCE=new TrailLayer();
         private TrailLayer(){super("katana_combo_trail",VertexFormats.POSITION_COLOR,VertexFormat.DrawMode.QUADS,
             8192,false,true,()->PHASES.forEach(RenderPhase::startDrawing),()->PHASES.forEach(RenderPhase::endDrawing));}
     }
+    private static final float[] ROWS={0,0.2f,0.6f,0.84f,0.93f,1};
+    private static final float[] OPACITY={0,0.20f,0.48f,0.80f,0.92f,0};
+    private static final int[][] COLORS={{55,130,235},{65,155,245},{100,200,255},{175,235,255},{240,252,255},{175,230,255}};
+    private static final Matrix4f IDENTITY=new Matrix4f();
     public static void render(LivingEntity player,ComboAnimation.Pose current,Matrix4f root,
                               VertexConsumerProvider vertices,boolean camera){
         if(player.isInvisible() || current.step()<0)return;
         var state=ComboClient.animationState(player.getUuid());if(state==null)return;
-        float age=current.age(),cutStart=ComboTiming.HIT_START[state.step()]-0.8f;
-        float cutEnd=ComboTiming.HIT_END[state.step()]+0.5f;
-        float head=Math.min(age,cutEnd),tail=Math.max(cutStart,age-6f);
-        if(head<=tail)return;
-        float birth=MathHelper.clamp((age-cutStart)/0.65f,0,1);
-        float fade=1-MathHelper.clamp((age-cutEnd)/6,0,1);fade=fade*fade*(3-2*fade);
-        float alpha=birth*fade*(camera?0.95f:1f);
+        float age=current.age(),start=ComboTiming.HIT_START[state.step()]-0.5f;
+        float end=ComboTiming.HIT_END[state.step()]+0.2f,lifetime=4.8f;
+        float head=Math.min(age,end),tail=Math.max(start,age-lifetime);
+        if(head-tail<0.025f)return;
+        float birth=smooth((age-start)/0.9f),fade=1-smooth((age-end)/lifetime);
+        float alpha=birth*fade*(camera?0.78f:0.90f);
         float sign=player.getMainArm()==Arm.LEFT?-1:1;
-        // Built-in additive layer: depth tested, emissive vertex colors, no shader/library dependency.
+        int count=48;
+        Vector3f[] outer=new Vector3f[count+1],inside=new Vector3f[count+1];
+        float[] opacity=new float[count+1],widths=new float[count+1];
+        for(int i=0;i<=count;i++){
+            float u=(float)i/count;
+            var pose=ComboAnimation.sampleAge(state.step(),MathHelper.lerp(u,tail,head));
+            if(pose==null)return;
+            // A pointed leading edge, gradually widening body, and a thin fading tail.
+            float envelope=(float)Math.pow(Math.max(0,Math.sin(Math.PI*u)),0.65);
+            float width=(camera?0.32f:0.42f)*envelope;
+            outer[i]=root.transformPosition(point(pose,1.08f,sign,camera));
+            inside[i]=root.transformPosition(point(pose,1.08f-width,sign,camera));
+            widths[i]=width*(camera?0.78f:1);
+            opacity[i]=alpha*smooth(u/0.7f);
+        }
+        Vector3f previousSide=null;
+        for(int i=0;i<=count;i++){
+            Vector3f tangent=new Vector3f(outer[Math.min(count,i+1)]).sub(outer[Math.max(0,i-1)]);
+            Vector3f view=new Vector3f(outer[i]).negate();
+            if(tangent.lengthSquared()<0.00000001f || view.lengthSquared()<0.00000001f)continue;
+            view.normalize();
+            Vector3f side=tangent.cross(view);
+            if(side.lengthSquared()<0.00000001f)continue;
+            side.normalize();
+            Vector3f inward=new Vector3f(inside[i]).sub(outer[i]);
+            if(previousSide!=null?side.dot(previousSide)<0:side.dot(inward)<0)side.negate();
+            previousSide=new Vector3f(side);
+            // Broaden only when viewed edge-on; keep a continuous orientation across adjacent segments.
+            float projected=new Vector3f(inward).fma(-inward.dot(view),view).length();
+            float readable=widths[i]*0.45f;
+            float face=readable>0.00001f?smooth((readable-projected)/readable):0;
+            inside[i]=new Vector3f(outer[i]).add(inward.mul(1-face)).fma(readable*face,side);
+        }
         VertexConsumer buffer=vertices.getBuffer(TrailLayer.INSTANCE);
-        int count=44;
-        for(int i=0;i<count;i++){
-            float a=(float)i/count,b=(float)(i+1)/count;
-            var pa=ComboAnimation.sampleAge(state.step(),MathHelper.lerp(a,tail,head));
-            var pb=ComboAnimation.sampleAge(state.step(),MathHelper.lerp(b,tail,head));
-            if(pa==null||pb==null)continue;
-            float aa=alpha*a,ab=alpha*b;
-            // Width and intensity taper into the oldest portion of the arc.
-            float innerA=1.1f-0.5f*a,innerB=1.1f-0.5f*b;
-            band(buffer,root,pa,pb,innerA,innerB,1.38f,1.38f,aa,ab,0.08f,0.62f,80,195,255,sign,camera);
-            band(buffer,root,pa,pb,1.38f,1.38f,1.43f,1.43f,aa,ab,0.95f,1f,235,252,255,sign,camera);
-            band(buffer,root,pa,pb,1.43f,1.43f,1.54f,1.54f,aa,ab,0.38f,0,110,215,255,sign,camera);
-            // The geometric cut plane can be edge-on, especially for the vertical finisher.
-            // A narrow view-facing edge keeps all three trails readable without disabling scene depth.
-            Vector3f tipA=root.transformPosition(point(pa,1.40f,sign,camera));
-            Vector3f tipB=root.transformPosition(point(pb,1.40f,sign,camera));
-            facingBand(buffer,tipA,tipB,aa,ab,camera?0.055f:0.085f,80,190,255,0.48f);
-            facingBand(buffer,tipA,tipB,aa,ab,camera?0.018f:0.028f,235,252,255,0.9f);
+        for(int i=0;i<count;i++)for(int row=0;row<ROWS.length-1;row++){
+            vertex(buffer,inside[i],outer[i],ROWS[row],COLORS[row],opacity[i]*OPACITY[row]);
+            vertex(buffer,inside[i+1],outer[i+1],ROWS[row],COLORS[row],opacity[i+1]*OPACITY[row]);
+            vertex(buffer,inside[i+1],outer[i+1],ROWS[row+1],COLORS[row+1],opacity[i+1]*OPACITY[row+1]);
+            vertex(buffer,inside[i],outer[i],ROWS[row+1],COLORS[row+1],opacity[i]*OPACITY[row+1]);
         }
     }
+    private static float smooth(float t){t=MathHelper.clamp(t,0,1);return t*t*(3-2*t);}
     private static Vector3f point(ComboAnimation.Pose pose,float radius,float sign,boolean camera){
-        Vector3f grip=pose.grip(),dir=pose.blade();
+        Vector3f grip=camera?AnimationMatrices.cameraGrip(pose):pose.grip(),dir=pose.blade();
         if(camera){
             Vector3f p=new Vector3f(-grip.x*sign/22,-0.3f-grip.y/32,-0.75f)
                 .fma(radius*0.78f,new Vector3f(-dir.x*sign,-dir.y,dir.z));
@@ -65,29 +83,9 @@ public final class SlashTrail {
         }
         return new Vector3f(grip.x*sign/16,grip.y/16,grip.z/16).fma(radius,new Vector3f(dir.x*sign,dir.y,dir.z));
     }
-    private static void band(VertexConsumer out,Matrix4f root,ComboAnimation.Pose a,ComboAnimation.Pose b,
-                             float innerA,float innerB,float outerA,float outerB,float aa,float ab,
-                             float innerAlpha,float outerAlpha,int red,int green,int blue,float sign,boolean camera){
-        vertex(out,root,point(a,innerA,sign,camera),red,green,blue,aa*innerAlpha);
-        vertex(out,root,point(b,innerB,sign,camera),red,green,blue,ab*innerAlpha);
-        vertex(out,root,point(b,outerB,sign,camera),red,green,blue,ab*outerAlpha);
-        vertex(out,root,point(a,outerA,sign,camera),red,green,blue,aa*outerAlpha);
-    }
-    private static void vertex(VertexConsumer out,Matrix4f root,Vector3f p,int r,int g,int b,float alpha){
-        out.vertex(root,p.x,p.y,p.z).color(r,g,b,(int)(255*MathHelper.clamp(alpha,0,1)));
-    }
-    private static void facingBand(VertexConsumer out,Vector3f a,Vector3f b,float aa,float ab,float width,
-                                   int red,int green,int blue,float opacity){
-        Vector3f tangent=new Vector3f(b).sub(a);
-        Vector3f view=new Vector3f(a).add(b).mul(-0.5f);
-        Vector3f side=tangent.cross(view);
-        if(side.lengthSquared()<0.00000001f)return;
-        side.normalize().mul(width);
-        Matrix4f identity=new Matrix4f();
-        vertex(out,identity,new Vector3f(a).sub(side),red,green,blue,aa*opacity);
-        vertex(out,identity,new Vector3f(b).sub(side),red,green,blue,ab*opacity);
-        vertex(out,identity,new Vector3f(b).add(side),red,green,blue,ab*opacity);
-        vertex(out,identity,new Vector3f(a).add(side),red,green,blue,aa*opacity);
+    private static void vertex(VertexConsumer out,Vector3f inside,Vector3f outside,float row,int[] rgb,float alpha){
+        Vector3f p=new Vector3f(inside).lerp(outside,row);
+        out.vertex(IDENTITY,p.x,p.y,p.z).color(rgb[0],rgb[1],rgb[2],(int)(255*MathHelper.clamp(alpha,0,1)));
     }
     private SlashTrail(){}
 }

@@ -18,7 +18,7 @@ public final class AnimationMatrices {
         // NONE will be passed to the renderer, so apply the original model transform exactly once here.
         model.getTransformation().getTransformation(mode).apply(left,matrices);
         Matrix4f vanilla=new Matrix4f(matrices.peek().getPositionMatrix());
-        Vector3f grip=pose.grip(),dir=pose.blade();dir.x*=sign;
+        Vector3f grip=camera?cameraGrip(pose):pose.grip(),dir=pose.blade();dir.x*=sign;
         Matrix4f animated=new Matrix4f(root);
         if(camera){
             animated.mul(cameraMotion(pose,sign));
@@ -33,6 +33,12 @@ public final class AnimationMatrices {
             .slerp(animated.getUnnormalizedRotation(new Quaternionf()).normalize(),w);
         matrices.peek().getPositionMatrix().translationRotateScale(translation,rotation,scale);
         matrices.peek().getNormalMatrix().set(matrices.peek().getPositionMatrix()).invert().transpose();
+    }
+    /** Keep overhead preparation visible in the camera without changing third-person reach. */
+    public static Vector3f cameraGrip(ComboAnimation.Pose pose){
+        Vector3f grip=pose.grip();
+        if(pose.step()==3 && grip.y<3)grip.y=3+(grip.y-3)*0.40f;
+        return grip;
     }
     /** Counter-rotation and lean are local weapon/shoulder motion, never changes to the player's aim. */
     public static Matrix4f cameraMotion(ComboAnimation.Pose pose,float sign){
