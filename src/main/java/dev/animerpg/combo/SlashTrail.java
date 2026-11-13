@@ -33,6 +33,7 @@ public final class SlashTrail {
         float alpha=birth*fade*(camera?0.78f:0.90f);
         float sign=player.getMainArm()==Arm.LEFT?-1:1;
         int count=48;
+        float tipRadius=player.getMainHandStack().getItem()==KatanaItems.KUROTSUKI?1.92f:1.08f;
         Vector3f[] outer=new Vector3f[count+1],inside=new Vector3f[count+1];
         float[] opacity=new float[count+1],widths=new float[count+1];
         for(int i=0;i<=count;i++){
@@ -42,8 +43,8 @@ public final class SlashTrail {
             // A pointed leading edge, gradually widening body, and a thin fading tail.
             float envelope=(float)Math.pow(Math.max(0,Math.sin(Math.PI*u)),0.65);
             float width=(camera?0.32f:0.42f)*envelope;
-            outer[i]=root.transformPosition(point(pose,1.08f,sign,camera));
-            inside[i]=root.transformPosition(point(pose,1.08f-width,sign,camera));
+            outer[i]=root.transformPosition(point(pose,tipRadius,sign,camera));
+            inside[i]=root.transformPosition(point(pose,tipRadius-width,sign,camera));
             widths[i]=width*(camera?0.78f:1);
             opacity[i]=alpha*smooth(u/0.7f);
         }

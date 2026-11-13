@@ -70,28 +70,32 @@ public final class ComboAnimation {
         while (segment < last-1 && frameAge > times[segment+1]) segment++;
         float span=times[segment+1]-times[segment];
         float t=MathHelper.clamp((frameAge-times[segment])/span,0,1);
-        float[] v=new float[13], velocity=new float[13];
+        float[] v=new float[13];
         // Time-aware cubic Hermite keeps the cut flowing through contact instead of stopping at each keyframe.
         for(int i=0;i<v.length;i++){
             float a=FRAMES[step][segment][i],b=FRAMES[step][segment+1][i];
             float m0=segment==0?0:(b-FRAMES[step][segment-1][i])/(times[segment+1]-times[segment-1]);
             float m1=segment==last-1?0:(FRAMES[step][segment+2][i]-a)/(times[segment+2]-times[segment]);
             v[i]=(2*t*t*t-3*t*t+1)*a+(t*t*t-2*t*t+t)*span*m0+(-2*t*t*t+3*t*t)*b+(t*t*t-t*t)*span*m1;
-            velocity[i]=((6*t*t-6*t)*a+(3*t*t-4*t+1)*span*m0+(-6*t*t+6*t)*b+(3*t*t-2*t)*span*m1)/span;
         }
         float rad=(float)Math.PI/180,yaw=v[3]*rad,elevation=v[4]*rad;
         Vector3f axis=new Vector3f(MathHelper.sin(yaw)*MathHelper.cos(elevation),-MathHelper.sin(elevation),-MathHelper.cos(yaw)*MathHelper.cos(elevation));
-        Vector3f edge=new Vector3f(MathHelper.cos(yaw)*MathHelper.cos(elevation),0,MathHelper.sin(yaw)*MathHelper.cos(elevation)).mul(velocity[3]*rad);
-        edge.fma(velocity[4]*rad,new Vector3f(-MathHelper.sin(yaw)*MathHelper.sin(elevation),-MathHelper.cos(elevation),MathHelper.cos(yaw)*MathHelper.sin(elevation)));
-        edge.add(velocity[0]/19,velocity[1]/19,velocity[2]/19).fma(-edge.dot(axis),axis);
-        if(edge.lengthSquared()<0.000001f){
-            Vector3f normal=step==0?new Vector3f(0,-1,0):step>=2?new Vector3f(1,0,0):new Vector3f(-0.65f,-0.75f,0);
-            edge=normal.cross(axis);
-            if(edge.lengthSquared()<0.000001f)edge=new Vector3f(0,0,1).cross(axis);
+        Vector3f plane;
+        if(step==0)plane=new Vector3f(0,-1,0);
+        else if(step>=2)plane=new Vector3f(1,0,0);
+        else {
+            float[] first=FRAMES[step][1],lastFrame=FRAMES[step][3];
+            Vector3f from=direction(first[3],first[4]),to=direction(lastFrame[3],lastFrame[4]);
+            plane=from.cross(to).normalize();
         }
+        Vector3f edge=plane.cross(axis).normalize();
         float weight=Math.min(MathHelper.clamp(age/1.25f,0,1),MathHelper.clamp((duration+ComboClient.RECOVERY_TICKS-age)/ComboClient.RECOVERY_TICKS,0,1));
         weight=weight*weight*(3-2*weight);
         return new Pose(v,weight,age,edge.normalize(),step);
+    }
+    private static Vector3f direction(float yaw,float elevation){
+        yaw*=(float)Math.PI/180;elevation*=(float)Math.PI/180;
+        return new Vector3f(MathHelper.sin(yaw)*MathHelper.cos(elevation),-MathHelper.sin(elevation),-MathHelper.cos(yaw)*MathHelper.cos(elevation));
     }
     private ComboAnimation() {}
 }

@@ -31,6 +31,7 @@ public final class ComboMod implements ModInitializer {
         Attack a=ATTACKS.get(p.getUuid());return a!=null && a.active;
     }
     @Override public void onInitialize() {
+        KatanaItems.init();
         KatanaDefense.init();
         PayloadTypeRegistry.playC2S().register(ComboPackets.Request.ID, ComboPackets.Request.CODEC);
         PayloadTypeRegistry.playS2C().register(ComboPackets.State.ID, ComboPackets.State.CODEC);
