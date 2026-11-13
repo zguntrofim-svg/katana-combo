@@ -48,8 +48,11 @@ public final class ComboAnimation {
         if (!(entity instanceof PlayerEntity) || state == null || client.world == null || !entity.isAlive()
                 || !(entity.getMainHandStack().getItem() instanceof SwordItem) || entity.isUsingItem()
                 || entity.isFallFlying() || entity.hasVehicle() || entity.isSwimming()) return null;
-        int step = state.step(), duration = ComboTiming.DURATION[step];
-        float age = Math.max(0, client.world.getTime() - state.started() + delta);
+        return sampleAge(state.step(),Math.max(0,client.world.getTime()-state.started()+delta));
+    }
+    /** Shared analytical path for the visible blade and its trailing ribbon. */
+    public static Pose sampleAge(int step,float age){
+        int duration=ComboTiming.DURATION[step];
         if (age >= duration+ComboClient.RECOVERY_TICKS) return null;
         float frameAge=Math.min(age,duration-0.05f);
         float[] times = {0, ComboTiming.HIT_START[step]-1, ComboTiming.HIT_START[step]+0.75f,

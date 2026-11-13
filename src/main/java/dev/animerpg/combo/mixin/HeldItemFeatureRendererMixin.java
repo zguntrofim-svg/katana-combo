@@ -1,5 +1,6 @@
 package dev.animerpg.combo.mixin;
 import dev.animerpg.combo.AnimationMatrices;
+import dev.animerpg.combo.SlashTrail;
 import dev.animerpg.combo.ComboAnimation;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -31,6 +32,7 @@ public abstract class HeldItemFeatureRendererMixin {
         if(katanaCombo$pose==null)return;
         boolean left=player.getMainArm()==Arm.LEFT;
         AnimationMatrices.blend(matrices,katanaCombo$root,katanaCombo$pose,player,stack,mode,left,false,left?-1:1);
+        SlashTrail.render(player,katanaCombo$pose,katanaCombo$root,vertices,false);
     }
     @ModifyArg(method="renderItem",at=@At(value="INVOKE",target="Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/render/model/json/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"),index=2)
     private ModelTransformationMode katanaCombo$mode(ModelTransformationMode mode){
