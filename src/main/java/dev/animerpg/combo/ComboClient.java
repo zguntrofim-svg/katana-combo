@@ -40,6 +40,7 @@ public final class ComboClient implements ClientModInitializer {
             for (UUID player : Set.copyOf(STATES.keySet())) stop(player);
         });
     }
+    public static ComboPackets.State animationState(UUID player) { return STATES.get(player); }
     private static void stop(UUID player) { STATES.remove(player); ANIMATION.invoker().update(player, null, 0, 0); }
     public static boolean interceptAttack(MinecraftClient client) {
         if (client.player == null || !ComboMod.eligible(client.player)) return false;

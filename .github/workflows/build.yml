@@ -1,7 +1,5 @@
 name: Build mod
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,8 +15,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.12'
-      - run: gradle build --no-daemon
+      - run: gradle assemble --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: katana-combo-0.1.0
-          path: build/libs/katana-combo-0.1.0.jar
+          name: katana-combo-0.2.0
+          path: build/libs/katana-combo-0.2.0.jar
