@@ -21,7 +21,7 @@ public final class ComboAnimation {
             FRAMES = new Gson().fromJson(new InputStreamReader(stream, StandardCharsets.UTF_8), float[][][].class);
         } catch (java.io.IOException e) { throw new ExceptionInInitializerError(e); }
     }
-    public record Pose(float[] values, float weight, float age, Vector3f cuttingDirection) {
+    public record Pose(float[] values, float weight, float age, Vector3f cuttingDirection, int step) {
         public Vector3f grip() { return new Vector3f(values[0], values[1], values[2]); }
         public Vector3f blade() {
             float yaw = values[3]*(float)Math.PI/180, elevation = values[4]*(float)Math.PI/180;
@@ -32,7 +32,7 @@ public final class ComboAnimation {
         public Quaternionf orientation(float handedness, boolean camera) {
             Vector3f axis=blade(), edge=new Vector3f(cuttingDirection);
             axis.x*=handedness; edge.x*=handedness;
-            if(camera){axis.y=-axis.y;edge.y=-edge.y;}
+            if(camera){axis.x=-axis.x;edge.x=-edge.x;axis.y=-axis.y;edge.y=-edge.y;}
             edge.fma(-edge.dot(axis),axis).normalize();
             Vector3f normal=new Vector3f(axis).cross(edge).normalize();
             // Generated vanilla sword textures run bottom-left to top-right in their local XY plane.
@@ -82,7 +82,7 @@ public final class ComboAnimation {
         }
         float weight=Math.min(MathHelper.clamp(age/1.25f,0,1),MathHelper.clamp((duration+ComboClient.RECOVERY_TICKS-age)/ComboClient.RECOVERY_TICKS,0,1));
         weight=weight*weight*(3-2*weight);
-        return new Pose(v,weight,age,edge.normalize());
+        return new Pose(v,weight,age,edge.normalize(),step);
     }
     private ComboAnimation() {}
 }

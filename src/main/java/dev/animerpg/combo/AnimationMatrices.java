@@ -21,8 +21,9 @@ public final class AnimationMatrices {
         Vector3f grip=pose.grip(),dir=pose.blade();dir.x*=sign;
         Matrix4f animated=new Matrix4f(root);
         if(camera){
-            dir.y=-dir.y;
-            animated.translate(grip.x*sign/22+dir.x*0.23f,-0.3f-grip.y/32+dir.y*0.23f,-0.75f+dir.z*0.23f);
+            animated.mul(cameraMotion(pose,sign));
+            dir.x=-dir.x;dir.y=-dir.y;
+            animated.translate(-grip.x*sign/22+dir.x*0.23f,-0.3f-grip.y/32+dir.y*0.23f,-0.75f+dir.z*0.23f);
         }else animated.translate(grip.x*sign/16+dir.x*0.30f,grip.y/16+dir.y*0.30f,grip.z/16+dir.z*0.30f);
         animated.rotate(pose.orientation(sign,camera)).scale(camera?0.95f:1.2f);
         float w=pose.weight();
@@ -32,6 +33,13 @@ public final class AnimationMatrices {
             .slerp(animated.getUnnormalizedRotation(new Quaternionf()).normalize(),w);
         matrices.peek().getPositionMatrix().translationRotateScale(translation,rotation,scale);
         matrices.peek().getNormalMatrix().set(matrices.peek().getPositionMatrix()).invert().transpose();
+    }
+    /** Counter-rotation and lean are local weapon/shoulder motion, never changes to the player's aim. */
+    public static Matrix4f cameraMotion(ComboAnimation.Pose pose,float sign){
+        float[] v=pose.values();float rad=(float)Math.PI/180;
+        float preparation=1-net.minecraft.util.math.MathHelper.clamp(pose.age()/ComboTiming.HIT_START[pose.step()],0,1);
+        return new Matrix4f().translate(-v[10]*0.008f*sign,-v[9]*0.015f,-v[5]*0.003f+0.08f*preparation)
+            .rotateY(-v[6]*rad*0.20f*sign).rotateX(-v[5]*rad*0.24f).rotateZ(v[11]*rad*0.16f*sign);
     }
     private AnimationMatrices(){}
 }

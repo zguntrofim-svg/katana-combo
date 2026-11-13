@@ -33,7 +33,7 @@ public abstract class HeldItemRendererMixin {
         if(katanaCombo$pose==null)return;
         boolean left=player.getMainArm()==Arm.LEFT;
         AnimationMatrices.blend(matrices,katanaCombo$root,katanaCombo$pose,player,stack,(player.getMainArm()==Arm.LEFT?ModelTransformationMode.FIRST_PERSON_LEFT_HAND:ModelTransformationMode.FIRST_PERSON_RIGHT_HAND),left,true,left?-1:1);
-        FirstPersonArms.render(player,katanaCombo$root,new Matrix4f(matrices.peek().getPositionMatrix()),vertices,light,katanaCombo$pose.weight());
+        FirstPersonArms.render(player,katanaCombo$root,new Matrix4f(matrices.peek().getPositionMatrix()),vertices,light,katanaCombo$pose);
         SlashTrail.render(player,katanaCombo$pose,katanaCombo$root,vertices,true);
     }
     @ModifyArg(method="renderFirstPersonItem",at=@At(value="INVOKE",target="Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/render/model/json/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"),index=2)
