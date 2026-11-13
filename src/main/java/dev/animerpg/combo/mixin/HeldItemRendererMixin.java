@@ -8,7 +8,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Arm;
 import net.minecraft.util.Hand;
-import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,7 +26,7 @@ public abstract class HeldItemRendererMixin {
         Vector3f cameraDir=new Vector3f(dir.x*sign,-dir.y,dir.z);
         matrices.push();
         matrices.translate(grip.x*sign/22+cameraDir.x*0.23f,-0.3f-grip.y/32+cameraDir.y*0.23f,-0.75f+cameraDir.z*0.23f);
-        matrices.multiply(new Quaternionf().rotationTo(new Vector3f(0.7071068f,0.7071068f,0),cameraDir));
+        matrices.multiply(p.orientation(sign,true));
         matrices.scale(0.95f,0.95f,0.95f);
         ((HeldItemRenderer)(Object)this).renderItem(player,stack,ModelTransformationMode.NONE,false,matrices,vertices,light);
         matrices.pop();ci.cancel();

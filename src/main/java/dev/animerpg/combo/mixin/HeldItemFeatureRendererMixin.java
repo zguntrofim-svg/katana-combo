@@ -8,7 +8,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Arm;
-import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,7 +26,7 @@ public abstract class HeldItemFeatureRendererMixin {
         matrices.push();
         // Player models use positive-down coordinates; held-item feature already inherits that space.
         matrices.translate(grip.x/16+dir.x*0.30f,grip.y/16+dir.y*0.30f,grip.z/16+dir.z*0.30f);
-        matrices.multiply(new Quaternionf().rotationTo(new Vector3f(0.7071068f,0.7071068f,0),dir));
+        matrices.multiply(p.orientation(sign,false));
         matrices.scale(1.2f,1.2f,1.2f);
         MinecraftClient.getInstance().getEntityRenderDispatcher().getHeldItemRenderer().renderItem(entity,stack,
             ModelTransformationMode.NONE,false,matrices,vertices,light);
