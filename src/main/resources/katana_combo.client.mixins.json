@@ -5,7 +5,8 @@
   "client": [
     "MinecraftClientMixin",
     "PlayerEntityModelMixin",
-    "HeldItemRendererMixin"
+    "HeldItemRendererMixin",
+    "HeldItemFeatureRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
