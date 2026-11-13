@@ -33,7 +33,12 @@ public final class KatanaModel implements BakedModel {
         try(var stream=KatanaModel.class.getResourceAsStream("/assets/katana_combo/models/item/kurotsuki_mesh.json")){
             if(stream==null)throw new IllegalStateException("Missing Kurotsuki mesh");
             Face[] faces=new Gson().fromJson(new InputStreamReader(stream,StandardCharsets.UTF_8),Face[].class);
-            for(Face face:faces){result.add(bake(face,false));result.add(bake(face,true));}
+            for(Face face:faces){
+                // Half-turn around the canonical hilt-to-tip diagonal, not around the hand or camera.
+                // Keep points on that axis fixed: only the cutting edge / spine and front / back swap.
+                for(float[] point:face.p){float x=point[0];point[0]=point[1];point[1]=x;point[2]=16-point[2];}
+                result.add(bake(face,false));result.add(bake(face,true));
+            }
         }catch(java.io.IOException e){throw new IllegalStateException("Unable to load Kurotsuki mesh",e);}
         quads=List.copyOf(result);
     }
