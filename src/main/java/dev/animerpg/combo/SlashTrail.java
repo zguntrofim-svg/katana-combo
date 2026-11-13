@@ -24,7 +24,7 @@ public final class SlashTrail {
     }
     public static void render(LivingEntity player,ComboAnimation.Pose current,Matrix4f root,
                               VertexConsumerProvider vertices,boolean camera){
-        if(player.isInvisible())return;
+        if(player.isInvisible() || current.step()<0)return;
         var state=ComboClient.animationState(player.getUuid());if(state==null)return;
         float age=current.age(),cutStart=ComboTiming.HIT_START[state.step()]-0.8f;
         float cutEnd=ComboTiming.HIT_END[state.step()]+0.5f;

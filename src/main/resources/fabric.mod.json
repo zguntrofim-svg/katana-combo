@@ -14,7 +14,8 @@
     ]
   },
   "mixins": [
-    "katana_combo.client.mixins.json"
+    "katana_combo.client.mixins.json",
+    "katana_combo.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.16.10",

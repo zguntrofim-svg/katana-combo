@@ -37,7 +37,7 @@ public final class AnimationMatrices {
     /** Counter-rotation and lean are local weapon/shoulder motion, never changes to the player's aim. */
     public static Matrix4f cameraMotion(ComboAnimation.Pose pose,float sign){
         float[] v=pose.values();float rad=(float)Math.PI/180;
-        float preparation=1-net.minecraft.util.math.MathHelper.clamp(pose.age()/ComboTiming.HIT_START[pose.step()],0,1);
+        float preparation=pose.step()<0?0:1-net.minecraft.util.math.MathHelper.clamp(pose.age()/ComboTiming.HIT_START[pose.step()],0,1);
         return new Matrix4f().translate(-v[10]*0.008f*sign,-v[9]*0.015f,-v[5]*0.003f+0.08f*preparation)
             .rotateY(-v[6]*rad*0.20f*sign).rotateX(-v[5]*rad*0.24f).rotateZ(v[11]*rad*0.16f*sign);
     }

@@ -22,6 +22,7 @@ public final class ComboClient implements ClientModInitializer {
     public static final int RECOVERY_TICKS = 7;
     private static final String[] NAMES = {"horizontal", "reverse_diagonal", "overhead"};
     @Override public void onInitializeClient() {
+        DefenseClient.init();
         ClientPlayNetworking.registerGlobalReceiver(ComboPackets.State.ID, (state, context) -> {
             if (state.step() >= 0 && state.step() < 3) STATES.put(state.player(), state);
             else {

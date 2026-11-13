@@ -45,9 +45,17 @@ public final class ComboAnimation {
     public static Pose sample(LivingEntity entity, float delta) {
         var client = MinecraftClient.getInstance();
         var state = ComboClient.animationState(entity.getUuid());
-        if (!(entity instanceof PlayerEntity) || state == null || client.world == null || !entity.isAlive()
-                || !(entity.getMainHandStack().getItem() instanceof SwordItem) || entity.isUsingItem()
-                || entity.isFallFlying() || entity.hasVehicle() || entity.isSwimming()) return null;
+        if (!(entity instanceof PlayerEntity player) || client.world==null || !entity.isAlive()
+                || !(entity.getMainHandStack().getItem() instanceof SwordItem)
+                || entity.isFallFlying() || entity.hasVehicle() || entity.isSwimming())return null;
+        if(KatanaDefense.holding(player)){
+            float age=player.getItemUseTime()+delta;
+            float w=MathHelper.clamp(age/3,0,1);w=w*w*(3-2*w);
+            float impulse=DefenseClient.impulse(player.getUuid(),client.world.getTime(),delta);
+            float[] v={-1,5,-8,-25-impulse*20,65,6-impulse*8,18+impulse*12,-14,16,0.5f,-0.5f,-3,12};
+            return new Pose(v,w,age,new Vector3f(0,0,-1),-1);
+        }
+        if(entity.isUsingItem() || state==null)return null;
         return sampleAge(state.step(),Math.max(0,client.world.getTime()-state.started()+delta));
     }
     /** Shared analytical path for the visible blade and its trailing ribbon. */

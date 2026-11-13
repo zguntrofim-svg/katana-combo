@@ -19,7 +19,7 @@ public final class ComboMod implements ModInitializer {
     private static final class Attack {
         int step = -1;
         long started, ended;
-        boolean active, queued;
+        boolean active, queued, counter;
         ItemStack weapon;
         net.minecraft.registry.RegistryKey<net.minecraft.world.World> world;
         final Set<Integer> hit = new HashSet<>();
@@ -27,7 +27,11 @@ public final class ComboMod implements ModInitializer {
     public static boolean eligible(net.minecraft.entity.player.PlayerEntity p) {
         return p.getMainHandStack().getItem() instanceof SwordItem && !p.isSpectator();
     }
+    public static boolean isAttacking(net.minecraft.entity.player.PlayerEntity p){
+        Attack a=ATTACKS.get(p.getUuid());return a!=null && a.active;
+    }
     @Override public void onInitialize() {
+        KatanaDefense.init();
         PayloadTypeRegistry.playC2S().register(ComboPackets.Request.ID, ComboPackets.Request.CODEC);
         PayloadTypeRegistry.playS2C().register(ComboPackets.State.ID, ComboPackets.State.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(ComboPackets.Request.ID, (packet, context) -> request(context.player()));
@@ -56,7 +60,8 @@ public final class ComboMod implements ModInitializer {
         begin(p, a, now);
     }
     private static void begin(ServerPlayerEntity p, Attack a, long now) {
-        a.step = ComboTiming.next(a.step, now, a.ended);
+        a.counter=KatanaDefense.consumeCounter(p);
+        a.step = a.counter?1:ComboTiming.next(a.step, now, a.ended);
         a.started = now; a.active = true; a.queued = false; a.hit.clear();
         a.weapon = p.getMainHandStack(); a.world = p.getWorld().getRegistryKey();
         broadcast(p, a.step, now);
@@ -94,7 +99,7 @@ public final class ComboMod implements ModInitializer {
             Vec3d offset = closest.subtract(eye);
             if (offset.lengthSquared() > reach * reach || offset.normalize().dotProduct(look) < 0.5) continue;
             a.hit.add(target.getId());
-            float damage = (float)p.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE) * ComboTiming.DAMAGE[a.step];
+            float damage = (float)p.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE) * ComboTiming.DAMAGE[a.step] * (a.counter?1.5f:1f);
             if (target.damage(p.getDamageSources().playerAttack(p), damage)) {
                 if (a.step == 2) target.takeKnockback(0.4, p.getX() - target.getX(), p.getZ() - target.getZ());
                 p.getMainHandStack().postHit(target, p);

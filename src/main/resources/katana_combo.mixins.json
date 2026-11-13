@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "dev.animerpg.combo.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ItemUseMixin",
+    "LivingDefenseMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
