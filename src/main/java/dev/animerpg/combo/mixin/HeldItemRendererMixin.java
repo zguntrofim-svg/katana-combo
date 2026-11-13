@@ -1,34 +1,41 @@
 package dev.animerpg.combo.mixin;
+import dev.animerpg.combo.AnimationMatrices;
 import dev.animerpg.combo.ComboAnimation;
-import net.minecraft.client.network.AbstractClientPlayerEntity;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Arm;
-import net.minecraft.util.Hand;
-import org.joml.Vector3f;
+import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import net.minecraft.client.network.AbstractClientPlayerEntity;
+import net.minecraft.util.Hand;
 @Mixin(HeldItemRenderer.class)
 public abstract class HeldItemRendererMixin {
-    @Inject(method="renderFirstPersonItem",at=@At("HEAD"),cancellable=true)
-    private void katanaCombo$blade(AbstractClientPlayerEntity player,float delta,float pitch,Hand hand,float swing,
-                                   ItemStack stack,float equip,MatrixStack matrices,VertexConsumerProvider vertices,int light,CallbackInfo ci) {
-        if(hand!=Hand.MAIN_HAND)return;
-        var p=ComboAnimation.sample(player,delta);if(p==null)return;
-        float sign=player.getMainArm()==Arm.LEFT?-1:1;
-        Vector3f grip=p.grip(),dir=p.blade();
-        // Camera Y points up; model Y points down. Keep the blade ahead of the near plane.
-        Vector3f cameraDir=new Vector3f(dir.x*sign,-dir.y,dir.z);
-        matrices.push();
-        matrices.translate(grip.x*sign/22+cameraDir.x*0.23f,-0.3f-grip.y/32+cameraDir.y*0.23f,-0.75f+cameraDir.z*0.23f);
-        matrices.multiply(p.orientation(sign,true));
-        matrices.scale(0.95f,0.95f,0.95f);
-        ((HeldItemRenderer)(Object)this).renderItem(player,stack,ModelTransformationMode.NONE,false,matrices,vertices,light);
-        matrices.pop();ci.cancel();
+    @Unique private Matrix4f katanaCombo$root;
+    @Unique private ComboAnimation.Pose katanaCombo$pose;
+    @Inject(method="renderFirstPersonItem",at=@At("HEAD"))
+    private void katanaCombo$capture(AbstractClientPlayerEntity player,float delta,float pitch,Hand hand,float swing,ItemStack stack,float equip,MatrixStack matrices,VertexConsumerProvider vertices,int light,CallbackInfo ci){
+        katanaCombo$pose=(hand==Hand.MAIN_HAND)?ComboAnimation.sample(player,delta):null;
+        katanaCombo$root=katanaCombo$pose==null?null:new Matrix4f(matrices.peek().getPositionMatrix());
     }
+    @Inject(method="renderFirstPersonItem",at=@At(value="INVOKE",target="Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/render/model/json/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"))
+    private void katanaCombo$blend(AbstractClientPlayerEntity player,float delta,float pitch,Hand hand,float swing,ItemStack stack,float equip,MatrixStack matrices,VertexConsumerProvider vertices,int light,CallbackInfo ci){
+        if(katanaCombo$pose==null)return;
+        boolean left=player.getMainArm()==Arm.LEFT;
+        AnimationMatrices.blend(matrices,katanaCombo$root,katanaCombo$pose,player,stack,(player.getMainArm()==Arm.LEFT?ModelTransformationMode.FIRST_PERSON_LEFT_HAND:ModelTransformationMode.FIRST_PERSON_RIGHT_HAND),left,true,left?-1:1);
+    }
+    @ModifyArg(method="renderFirstPersonItem",at=@At(value="INVOKE",target="Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/render/model/json/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"),index=2)
+    private ModelTransformationMode katanaCombo$mode(ModelTransformationMode mode){
+        return katanaCombo$pose==null?mode:ModelTransformationMode.NONE;
+    }
+    @ModifyArg(method="renderFirstPersonItem",at=@At(value="INVOKE",target="Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/render/model/json/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"),index=3)
+    private boolean katanaCombo$hand(boolean left){return katanaCombo$pose==null?left:false;}
 }

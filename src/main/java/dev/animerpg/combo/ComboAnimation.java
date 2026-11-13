@@ -50,13 +50,14 @@ public final class ComboAnimation {
                 || entity.isFallFlying() || entity.hasVehicle() || entity.isSwimming()) return null;
         int step = state.step(), duration = ComboTiming.DURATION[step];
         float age = Math.max(0, client.world.getTime() - state.started() + delta);
-        if (age >= duration) return null;
+        if (age >= duration+ComboClient.RECOVERY_TICKS) return null;
+        float frameAge=Math.min(age,duration-0.05f);
         float[] times = {0, ComboTiming.HIT_START[step]-1, ComboTiming.HIT_START[step]+0.75f,
             ComboTiming.HIT_END[step]+2, duration};
         int segment = 0;
-        while (segment < 3 && age > times[segment+1]) segment++;
+        while (segment < 3 && frameAge > times[segment+1]) segment++;
         float span=times[segment+1]-times[segment];
-        float t=MathHelper.clamp((age-times[segment])/span,0,1);
+        float t=MathHelper.clamp((frameAge-times[segment])/span,0,1);
         float[] v=new float[13], velocity=new float[13];
         // Time-aware cubic Hermite keeps the cut flowing through contact instead of stopping at each keyframe.
         for(int i=0;i<v.length;i++){
@@ -76,7 +77,7 @@ public final class ComboAnimation {
             edge=normal.cross(axis);
             if(edge.lengthSquared()<0.000001f)edge=new Vector3f(0,0,1).cross(axis);
         }
-        float weight=Math.min(MathHelper.clamp(age/1.25f,0,1),MathHelper.clamp((duration-age)/2,0,1));
+        float weight=Math.min(MathHelper.clamp(age/1.25f,0,1),MathHelper.clamp((duration+ComboClient.RECOVERY_TICKS-age)/ComboClient.RECOVERY_TICKS,0,1));
         weight=weight*weight*(3-2*weight);
         return new Pose(v,weight,age,edge.normalize());
     }

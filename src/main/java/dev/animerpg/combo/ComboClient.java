@@ -19,18 +19,25 @@ public final class ComboClient implements ClientModInitializer {
             for (AnimationListener listener : listeners) listener.update(player, animation, elapsed, duration);
         });
     private static final Map<UUID, ComboPackets.State> STATES = new HashMap<>();
+    public static final int RECOVERY_TICKS = 7;
     private static final String[] NAMES = {"horizontal", "reverse_diagonal", "overhead"};
     @Override public void onInitializeClient() {
         ClientPlayNetworking.registerGlobalReceiver(ComboPackets.State.ID, (state, context) -> {
             if (state.step() >= 0 && state.step() < 3) STATES.put(state.player(), state);
-            else stop(state.player());
+            else {
+                var previous=STATES.get(state.player());
+                var world=context.client().world;
+                // A regular end packet starts visual recovery; an interrupted attack stops immediately.
+                if(previous==null || world==null || world.getTime()-previous.started()<ComboTiming.DURATION[previous.step()]-1)
+                    stop(state.player());
+            }
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.world == null) { STATES.clear(); return; }
             for (var iterator = STATES.entrySet().iterator(); iterator.hasNext();) {
                 var entry = iterator.next(); var s = entry.getValue();
                 long age = Math.max(0, client.world.getTime() - s.started());
-                int duration = ComboTiming.DURATION[s.step()];
+                int duration = ComboTiming.DURATION[s.step()]+RECOVERY_TICKS;
                 if (age >= duration) {
                     ANIMATION.invoker().update(s.player(), null, 0, 0); iterator.remove();
                 } else ANIMATION.invoker().update(s.player(), Identifier.of("katana_combo", NAMES[s.step()]), (int)age, duration);
