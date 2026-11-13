@@ -20,11 +20,11 @@ public final class ComboClient implements ClientModInitializer {
         });
     private static final Map<UUID, ComboPackets.State> STATES = new HashMap<>();
     public static final int RECOVERY_TICKS = 7;
-    private static final String[] NAMES = {"horizontal", "reverse_diagonal", "overhead"};
+    private static final String[] NAMES = {"horizontal", "reverse_diagonal", "overhead", "jump_counter"};
     @Override public void onInitializeClient() {
         DefenseClient.init();
         ClientPlayNetworking.registerGlobalReceiver(ComboPackets.State.ID, (state, context) -> {
-            if (state.step() >= 0 && state.step() < 3) STATES.put(state.player(), state);
+            if (state.step() >= 0 && state.step() < ComboTiming.DURATION.length) STATES.put(state.player(), state);
             else {
                 var previous=STATES.get(state.player());
                 var world=context.client().world;

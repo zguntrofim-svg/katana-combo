@@ -61,7 +61,7 @@ public final class ComboMod implements ModInitializer {
     }
     private static void begin(ServerPlayerEntity p, Attack a, long now) {
         a.counter=KatanaDefense.consumeCounter(p);
-        a.step = a.counter?1:ComboTiming.next(a.step, now, a.ended);
+        a.step = a.counter?3:ComboTiming.next(a.step, now, a.ended);
         a.started = now; a.active = true; a.queued = false; a.hit.clear();
         a.weapon = p.getMainHandStack(); a.world = p.getWorld().getRegistryKey();
         broadcast(p, a.step, now);
@@ -78,6 +78,16 @@ public final class ComboMod implements ModInitializer {
         }
         if (!a.active) return;
         long age = now - a.started;
+        if(a.counter && age==2 && p.isOnGround() && !p.isTouchingWater() && !p.hasVehicle()){
+            Vec3d forward=p.getRotationVec(1).multiply(1,0,1).normalize();
+            Vec3d velocity=p.getVelocity().add(forward.multiply(0.14));
+            double speed=Math.sqrt(velocity.x*velocity.x+velocity.z*velocity.z);
+            double limit=speed>0.32?0.32/speed:1;
+            counterVelocity(p,new Vec3d(velocity.x*limit,0.42,velocity.z*limit));
+        }
+        if(a.counter && age==ComboTiming.HIT_START[a.step] && !p.isOnGround() && !p.isTouchingWater() && !p.hasVehicle()){
+            Vec3d velocity=p.getVelocity();counterVelocity(p,new Vec3d(velocity.x,Math.min(velocity.y,-0.16),velocity.z));
+        }
         if (age >= ComboTiming.DURATION[a.step]) {
             boolean queued = a.queued;
             a.active = false; a.ended = now;
@@ -85,9 +95,14 @@ public final class ComboMod implements ModInitializer {
             if (queued) begin(p, a, now);
         } else if (age >= ComboTiming.HIT_START[a.step] && age <= ComboTiming.HIT_END[a.step]) hit(p, a);
     }
+    private static void counterVelocity(ServerPlayerEntity p,Vec3d velocity){
+        p.setVelocity(velocity);p.velocityModified=true;
+        p.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket(p));
+    }
     private static void hit(ServerPlayerEntity p, Attack a) {
         double reach = Math.min(3.0, p.getEntityInteractionRange());
         Vec3d eye = p.getEyePos(), look = p.getRotationVec(1f);
+        if(a.counter)look=new Vec3d(look.x,-0.55,look.z).normalize();
         for (LivingEntity target : p.getServerWorld().getEntitiesByClass(LivingEntity.class,
                 p.getBoundingBox().expand(reach), e -> e != p && e.isAlive() && !e.isSpectator())) {
             if (a.hit.contains(target.getId()) || !p.canSee(target) || !p.canTarget(target)) continue;

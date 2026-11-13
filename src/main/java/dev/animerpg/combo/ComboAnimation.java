@@ -84,7 +84,7 @@ public final class ComboAnimation {
         edge.fma(velocity[4]*rad,new Vector3f(-MathHelper.sin(yaw)*MathHelper.sin(elevation),-MathHelper.cos(elevation),MathHelper.cos(yaw)*MathHelper.sin(elevation)));
         edge.add(velocity[0]/19,velocity[1]/19,velocity[2]/19).fma(-edge.dot(axis),axis);
         if(edge.lengthSquared()<0.000001f){
-            Vector3f normal=step==0?new Vector3f(0,-1,0):step==2?new Vector3f(1,0,0):new Vector3f(-0.65f,-0.75f,0);
+            Vector3f normal=step==0?new Vector3f(0,-1,0):step>=2?new Vector3f(1,0,0):new Vector3f(-0.65f,-0.75f,0);
             edge=normal.cross(axis);
             if(edge.lengthSquared()<0.000001f)edge=new Vector3f(0,0,1).cross(axis);
         }

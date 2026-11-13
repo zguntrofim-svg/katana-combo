@@ -77,7 +77,7 @@ public final class KatanaDefense {
         ServerLifecycleEvents.SERVER_STOPPED.register(server->GUARDS.clear());
         EntityTrackingEvents.START_TRACKING.register((entity,observer)->{
             Guard g=GUARDS.get(entity.getUuid());
-            if(entity instanceof ServerPlayerEntity p && g!=null)send(observer,p,g,g.active?1:0);
+            if(entity instanceof ServerPlayerEntity p && g!=null)send(observer,p,g,g.active?1:(g.counterUntil>p.getWorld().getTime()?3:0));
         });
     }
     private static boolean perfect(Guard g,long now){return g!=null&&g.active&&g.perfect&&!g.spent&&now-g.started>=0&&now-g.started<PARRY_TICKS;}
@@ -111,6 +111,7 @@ public final class KatanaDefense {
     }
     public static boolean consumeCounter(ServerPlayerEntity p){
         Guard g=GUARDS.get(p.getUuid());
+        if(!p.isOnGround() || p.isTouchingWater() || p.isClimbing() || p.hasVehicle() || p.isFallFlying())return false;
         if(g==null || g.counterUntil<=p.getWorld().getTime() || g.weapon!=p.getMainHandStack()
                 || g.dimension!=p.getWorld().getRegistryKey())return false;
         g.counterUntil=0;publish(p,g,4);return true;
