@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "katana_combo",
+  "version": "${version}",
+  "name": "Katana Combo",
+  "description": "Server-authoritative three-hit sword combo.",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.animerpg.combo.ComboMod"
+    ],
+    "client": [
+      "dev.animerpg.combo.ComboClient"
+    ]
+  },
+  "mixins": [
+    "katana_combo.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "breaks": {
+    "bettercombat": "*",
+    "epicfight": "*"
+  }
+}
