@@ -25,6 +25,7 @@ public final class EffectNetwork {
         public Id<? extends CustomPayload> getId(){return ID;}
     }
     private static final Map<UUID,Integer> STYLES=new HashMap<>();
+    public static int styleFor(UUID player){return STYLES.getOrDefault(player,EffectStyle.AZURE.ordinal());}
     public static void init(){
         PayloadTypeRegistry.playC2S().register(Choice.ID,Choice.CODEC);PayloadTypeRegistry.playS2C().register(State.ID,State.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(Choice.ID,(packet,context)->{

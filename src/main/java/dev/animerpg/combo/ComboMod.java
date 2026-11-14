@@ -33,6 +33,7 @@ public final class ComboMod implements ModInitializer {
     @Override public void onInitialize() {
         KatanaItems.init();
         EffectNetwork.init();
+        HitImpact.init();
         KatanaDefense.init();
         PayloadTypeRegistry.playC2S().register(ComboPackets.Request.ID, ComboPackets.Request.CODEC);
         PayloadTypeRegistry.playS2C().register(ComboPackets.State.ID, ComboPackets.State.CODEC);
@@ -118,6 +119,7 @@ public final class ComboMod implements ModInitializer {
             a.hit.add(target.getId());
             float damage = (float)p.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE) * ComboTiming.DAMAGE[a.step] * (a.counter?1.5f:1f);
             if (target.damage(p.getDamageSources().playerAttack(p), damage)) {
+                HitImpact.emit(p,target,closest,a.step==2);
                 if (a.step == 2) target.takeKnockback(0.4, p.getX() - target.getX(), p.getZ() - target.getZ());
                 p.getMainHandStack().postHit(target, p);
             }
