@@ -32,6 +32,7 @@ public final class ComboMod implements ModInitializer {
     }
     @Override public void onInitialize() {
         KatanaItems.init();
+        EffectNetwork.init();
         KatanaDefense.init();
         PayloadTypeRegistry.playC2S().register(ComboPackets.Request.ID, ComboPackets.Request.CODEC);
         PayloadTypeRegistry.playS2C().register(ComboPackets.State.ID, ComboPackets.State.CODEC);

@@ -6,7 +6,8 @@
     "MinecraftClientMixin",
     "PlayerEntityModelMixin",
     "HeldItemRendererMixin",
-    "HeldItemFeatureRendererMixin"
+    "HeldItemFeatureRendererMixin",
+    "EffectKeyboardMixin"
   ],
   "injectors": {
     "defaultRequire": 1
