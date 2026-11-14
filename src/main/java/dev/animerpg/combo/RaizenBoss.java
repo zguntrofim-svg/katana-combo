@@ -16,6 +16,10 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import net.minecraft.util.math.Box;
 
 public final class RaizenBoss extends HostileEntity {
     public static final EntityType<RaizenBoss> TYPE=Registry.register(Registries.ENTITY_TYPE,Identifier.of("katana_combo","raizen"),
@@ -32,6 +36,7 @@ public final class RaizenBoss extends HostileEntity {
     private static final TrackedData<Boolean> PHASE_TWO=DataTracker.registerData(RaizenBoss.class,TrackedDataHandlerRegistry.BOOLEAN);
     private int cooldown,sequence;
     private boolean transitionUsed;
+    private final Set<UUID> dashHits=new HashSet<>();
     private float actionYaw;
     public static void init(){
         FabricDefaultAttributeRegistry.register(TYPE,HostileEntity.createHostileAttributes()
@@ -51,6 +56,7 @@ public final class RaizenBoss extends HostileEntity {
     public int action(){return dataTracker.get(ACTION);}
     public boolean phaseTwo(){return dataTracker.get(PHASE_TWO);}
     private void beginAction(int type){
+        dashHits.clear();
         dataTracker.set(ACTION,type);dataTracker.set(ATTACK_START,getWorld().getTime());
         var target=getTarget();
         if(target!=null){var d=target.getPos().subtract(getPos());actionYaw=(float)(Math.atan2(-d.x,d.z)*180/Math.PI);}else actionYaw=getYaw();
@@ -89,7 +95,22 @@ public final class RaizenBoss extends HostileEntity {
         targetSelector.add(1,new RevengeGoal(this));
         targetSelector.add(2,new ActiveTargetGoal<>(this,PlayerEntity.class,true));
     }
+    private boolean damageTarget(LivingEntity target){
+        return target!=this && target.isAlive() && (target==getTarget() || target instanceof PlayerEntity)
+            && !(target instanceof PlayerEntity p && (p.isCreative() || p.isSpectator()))
+            && canTarget(target) && canSee(target);
+    }
+    private void dashContacts(Box before){
+        // Sweep both bodies for this tick: approaching players can cross the charge before its final slash.
+        Box sweep=before.union(getBoundingBox()).expand(.4,.15,.4);
+        for(var target:getWorld().getEntitiesByClass(LivingEntity.class,sweep.expand(2),this::damageTarget)){
+            Box targetSweep=target.getBoundingBox().union(target.getBoundingBox().offset(
+                target.prevX-target.getX(),target.prevY-target.getY(),target.prevZ-target.getZ()));
+            if(sweep.intersects(targetSweep) && dashHits.add(target.getUuid()))tryAttack(target);
+        }
+    }
     @Override public void tick(){
+        Box before=getBoundingBox();
         super.tick();
         if(!getWorld().isClient){
             if(cooldown>0)cooldown--;
@@ -104,6 +125,7 @@ public final class RaizenBoss extends HostileEntity {
                     double angle=Math.toRadians(actionYaw),speed=phaseTwo()?.68:.56;
                     move(MovementType.SELF,new net.minecraft.util.math.Vec3d(-Math.sin(angle)*speed,0,Math.cos(angle)*speed));
                 }
+                if(type==RaizenMotion.DASH && age>=7 && age<=RaizenMotion.hit(type))dashContacts(before);
                 if(age==RaizenMotion.hit(type)){
                     double reach=type==RaizenMotion.HORIZONTAL?4.5:4.2;
                     for(var target:getWorld().getEntitiesByClass(net.minecraft.entity.LivingEntity.class,getBoundingBox().expand(reach,1.5,reach),
@@ -112,7 +134,8 @@ public final class RaizenBoss extends HostileEntity {
                         if(squaredDistanceTo(target)>reach*reach || !canSee(target) || !canTarget(target))continue;
                         var offset=target.getPos().subtract(getPos()).multiply(1,0,1).normalize();
                         double cone=type==RaizenMotion.HORIZONTAL?-.15:.45;
-                        if(getRotationVec(1).multiply(1,0,1).normalize().dotProduct(offset)>cone)tryAttack(target);
+                        if(getRotationVec(1).multiply(1,0,1).normalize().dotProduct(offset)>cone
+                                && (type!=RaizenMotion.DASH || dashHits.add(target.getUuid())))tryAttack(target);
                     }
                 }
                 if(age>=RaizenMotion.duration(type)){
