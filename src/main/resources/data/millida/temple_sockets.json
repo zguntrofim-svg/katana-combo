@@ -1,0 +1,12 @@
+{
+  "coordinate_system": "Offsets from the temple origin in world blocks; entrance faces south (+Z)",
+  "footprint": [120, 120],
+  "boss": {"id": "raizen", "pos": [0, 6, 5], "entity": "katana_combo:raizen", "automatic_spawn": false},
+  "altars": [
+    {"id": "storm_sanctuary", "pos": [0, 19, -42]},
+    {"id": "western_shrine", "pos": [-40, 10, -1]},
+    {"id": "eastern_shrine", "pos": [40, 10, -1]}
+  ],
+  "npc_slots": [{"id": "quest_giver", "pos": [-13, 5, 32]}, {"id": "temple_keeper", "pos": [13, 5, 32]}],
+  "entrance": [0, 3, 58]
+}

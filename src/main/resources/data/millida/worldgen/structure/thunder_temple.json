@@ -1,0 +1,7 @@
+{
+  "type": "millida:thunder_temple",
+  "biomes": "#millida:has_thunder_temple",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

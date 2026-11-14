@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "katana_combo",
   "version": "${version}",
-  "name": "Katana Combo",
-  "description": "Server-authoritative three-hit sword combo.",
+  "name": "Millida \u2014 Katana & Storm Shogun",
+  "description": "Server-authoritative katana combat, Raizen boss and the Temple of the Thunder Shogun.",
   "environment": "*",
   "entrypoints": {
     "main": [
