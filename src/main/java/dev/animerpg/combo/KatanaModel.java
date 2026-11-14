@@ -20,6 +20,7 @@ public final class KatanaModel implements BakedModel {
     // The model loader discovers every models/*.json: custom geometry must live in a valid object.
     private record Mesh(Face[] millida_mesh){}
     private final BakedModel base;
+    private final boolean storm;
     private final List<BakedQuad> quads;
     public static void init(){
         ModelLoadingPlugin.register(context->context.modifyModelAfterBake().register((model,bake)->{
@@ -35,7 +36,7 @@ public final class KatanaModel implements BakedModel {
     }
     private KatanaModel(BakedModel base){this(base,"/assets/katana_combo/models/item/kurotsuki_mesh.json",true);}
     private KatanaModel(BakedModel base,String resource,boolean reverseEdge){
-        this.base=base;
+        this.base=base;storm=resource.endsWith("amakiri_mesh.json");
         List<BakedQuad> result=new ArrayList<>();
         try(var stream=KatanaModel.class.getResourceAsStream(resource)){
             if(stream==null)throw new IllegalStateException("Missing mesh "+resource);
@@ -65,7 +66,7 @@ public final class KatanaModel implements BakedModel {
             float v=(j<2?1:15)/16f;
             data[offset+4]=Float.floatToRawIntBits(sprite.getFrameU(u));
             data[offset+5]=Float.floatToRawIntBits(sprite.getFrameV(v));
-            data[offset+6]=0;data[offset+7]=packed;
+            data[offset+6]=storm && (face.tile==3 || face.tile==4)?15728880:0;data[offset+7]=packed;
         }
         return new BakedQuad(data,-1,Direction.getFacing(normal.x,normal.y,normal.z),sprite,face.tile!=3 && face.tile!=4);
     }

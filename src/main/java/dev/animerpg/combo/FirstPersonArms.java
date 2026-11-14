@@ -37,7 +37,8 @@ public final class FirstPersonArms {
         if(player.isInvisible() || weight<=0.001f)return;
         Matrix4f handle=new Matrix4f(root).invert().mul(item);
         Vector3f main=handle.transformPosition(new Vector3f(-0.19f,-0.19f,0));
-        Vector3f support=handle.transformPosition(new Vector3f(-0.34f,-0.34f,0));
+        float second=player.getMainHandStack().isOf(RaizenBoss.AMAKIRI)?.04f:-.34f;
+        Vector3f support=handle.transformPosition(new Vector3f(second,second,0));
         int mainSide=player.getMainArm()==Arm.RIGHT?0:1;
         Vector3f handleAxis=handle.transformDirection(new Vector3f(0.7071068f,0.7071068f,0)).normalize();
         drawArm(player,mainSide,main,handleAxis,pose,root,vertices,light,weight);
@@ -67,12 +68,12 @@ public final class FirstPersonArms {
         int slim=player.getSkinTextures().model()==SkinTextures.Model.SLIM?1:0;
         var buffer=vertices.getBuffer(RenderLayer.getEntityTranslucent(player.getSkinTextures().texture()));
         int color=((int)(255*Math.min(1,weight))<<24)|0xffffff;
-        boolean sleeve=player.isPartVisible(side==0?PlayerModelPart.RIGHT_SLEEVE:PlayerModelPart.LEFT_SLEEVE);
-        segment(MODELS[slim][side],0,shoulder,elbow,root,buffer,light,color,sleeve,handleAxis);
-        segment(MODELS[slim][side],1,elbow,wrist,root,buffer,light,color,sleeve,handleAxis);
+        boolean sleeve=!player.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).isOf(StormItems.CHESTPLATE) && player.isPartVisible(side==0?PlayerModelPart.RIGHT_SLEEVE:PlayerModelPart.LEFT_SLEEVE);
+        segment(MODELS[slim][side],0,shoulder,elbow,root,buffer,light,color,sleeve,handleAxis,player,side,vertices);
+        segment(MODELS[slim][side],1,elbow,wrist,root,buffer,light,color,sleeve,handleAxis,player,side,vertices);
     }
     private static void segment(ModelPart[] parts,int index,Vector3f from,Vector3f to,Matrix4f root,
-                                VertexConsumer buffer,int light,int color,boolean sleeve,Vector3f handleAxis){
+                                VertexConsumer buffer,int light,int color,boolean sleeve,Vector3f handleAxis,AbstractClientPlayerEntity player,int side,VertexConsumerProvider vertices){
         Vector3f delta=new Vector3f(to).sub(from);float length=delta.length();if(length<0.001f)return;
         MatrixStack matrices=new MatrixStack();
         matrices.peek().getPositionMatrix().set(root);
@@ -88,6 +89,7 @@ public final class FirstPersonArms {
         matrices.scale(0.88f,length/0.375f,0.88f);
         parts[index].render(matrices,buffer,light,OverlayTexture.DEFAULT_UV,color);
         if(sleeve)parts[index+2].render(matrices,buffer,light,OverlayTexture.DEFAULT_UV,color);
+        StormArmorRenderer.firstPerson(player,side,index,matrices,vertices,light,color);
     }
     private FirstPersonArms(){}
 }

@@ -37,7 +37,7 @@ public final class RaizenModel extends EntityModel<RaizenBoss> {
         void push(MatrixStack matrices){matrices.push();matrices.translate(position.x/16,position.y/16,position.z/16);matrices.multiply(rotation);matrices.scale(1,stretch,1);}
         void render(MatrixStack matrices,VertexConsumer out,int light,int overlay,int color){push(matrices);part.render(matrices,out,light,overlay,color);matrices.pop();}
     }
-    private static ModelPart load(String name){
+    static ModelPart load(String name){
         try(var stream=RaizenModel.class.getResourceAsStream("/assets/katana_combo/models/entity/"+name+".json")){
             if(stream==null)throw new IllegalStateException("Missing boss model "+name);
             File file=new Gson().fromJson(new InputStreamReader(stream,StandardCharsets.UTF_8),File.class);

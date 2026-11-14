@@ -60,10 +60,12 @@ public abstract class PlayerEntityModelMixin {
         m.head.pivotX+=root.x;m.head.pivotY+=root.y;m.head.pivotZ+=root.z;
         m.head.pitch+=m.body.pitch*0.3f;m.head.yaw+=m.body.yaw*0.2f;
         m.hat.copyTransform(m.head);
-        // Main hand near guard; support hand 1.5 pixels down the same handle.
+        // Katana: rear support; Amakiri: left/front grip farther up the same rigid pole.
         Vector3f grip=p.grip(), direction=p.blade(); grip.x*=sign; direction.x*=sign;
         ModelPart main=sign>0?m.rightArm:m.leftArm, support=sign>0?m.leftArm:m.rightArm;
-        aim(main,grip,w); aim(support,new Vector3f(grip).fma(-1.5f,direction),w);
+        aim(main,grip,w);
+        if(player.getOffHandStack().isEmpty())aim(support,new Vector3f(grip).fma(player.getMainHandStack().isOf(dev.animerpg.combo.RaizenBoss.AMAKIRI)?6.6f:-1.5f,direction),w);
+        if(p.step()!=-2){
         m.rightLeg.pitch=MathHelper.lerp(w,m.rightLeg.pitch,v[7]*rad);
         m.leftLeg.pitch=MathHelper.lerp(w,m.leftLeg.pitch,v[8]*rad);
         m.rightLeg.yaw=MathHelper.lerp(w,m.rightLeg.yaw,-0.12f);
@@ -73,6 +75,7 @@ public abstract class PlayerEntityModelMixin {
         m.leftLeg.roll=MathHelper.lerp(w,m.leftLeg.roll,-spread);
         m.rightLeg.pivotX+=v[10]*w*sign*0.35f;m.leftLeg.pivotX+=v[10]*w*sign*0.35f;
         m.rightLeg.pivotZ+=v[7]*rad*w*2;m.leftLeg.pivotZ+=v[8]*rad*w*2;
+        }
         m.jacket.copyTransform(m.body);m.rightSleeve.copyTransform(m.rightArm);m.leftSleeve.copyTransform(m.leftArm);
         m.rightPants.copyTransform(m.rightLeg);m.leftPants.copyTransform(m.leftLeg);
     }

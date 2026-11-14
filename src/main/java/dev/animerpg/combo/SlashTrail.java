@@ -31,7 +31,7 @@ public final class SlashTrail {
     private static final Matrix4f IDENTITY=new Matrix4f();
     public static void render(LivingEntity player,ComboAnimation.Pose current,Matrix4f root,
                               VertexConsumerProvider vertices,boolean camera){
-        if(player.isInvisible() || current.step()<0)return;
+        if(player.isInvisible() || current.step()<0 || StormClient.isCasting(player.getUuid()))return;
         var state=ComboClient.animationState(player.getUuid());if(state==null)return;
         EffectStyle style=EffectClient.forPlayer(player.getUuid());
         if(style==EffectStyle.PHANTOM){
@@ -52,7 +52,7 @@ public final class SlashTrail {
         float alpha=birth*fade*(camera?0.95f:1f)*strength;
         float sign=player.getMainArm()==Arm.LEFT?-1:1;
         int count=48;
-        float tipRadius=player.getMainHandStack().getItem()==KatanaItems.KUROTSUKI?1.92f:1.08f;
+        float tipRadius=player.getMainHandStack().isOf(RaizenBoss.AMAKIRI)?2.75f:player.getMainHandStack().getItem()==KatanaItems.KUROTSUKI?1.92f:1.08f;
         Vector3f[] outer=new Vector3f[count+1],inside=new Vector3f[count+1];
         float[] opacity=new float[count+1],widths=new float[count+1];
         for(int i=0;i<=count;i++){

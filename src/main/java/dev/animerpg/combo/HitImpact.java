@@ -21,10 +21,13 @@ public record HitImpact(Identifier dimension,int style,double x,double y,double 
     public Id<? extends CustomPayload> getId(){return ID;}
     public static void init(){PayloadTypeRegistry.playS2C().register(ID,CODEC);}
     public static void emit(ServerPlayerEntity attacker,LivingEntity target,Vec3d contact,boolean finisher){
+        emitStyle(attacker,target,contact,finisher,EffectNetwork.styleFor(attacker.getUuid()));
+    }
+    public static void emitStyle(ServerPlayerEntity attacker,LivingEntity target,Vec3d contact,boolean finisher,int style){
         Vec3d normal=attacker.getEyePos().subtract(contact).normalize();
         if(normal.lengthSquared()<0.01)normal=attacker.getRotationVec(1).negate();
         var world=attacker.getServerWorld();
-        HitImpact packet=new HitImpact(world.getRegistryKey().getValue(),EffectNetwork.styleFor(attacker.getUuid()),
+        HitImpact packet=new HitImpact(world.getRegistryKey().getValue(),style,
             contact.x,contact.y,contact.z,(float)normal.x,(float)normal.y,(float)normal.z,finisher,world.getRandom().nextLong());
         // Every observer in this dimension gets the same confirmed point, style and animation seed.
         for(ServerPlayerEntity viewer:world.getPlayers())if(ServerPlayNetworking.canSend(viewer,ID))ServerPlayNetworking.send(viewer,packet);

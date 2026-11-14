@@ -28,7 +28,8 @@ public final class RaizenBoss extends HostileEntity {
             .maxTrackingRange(12).trackingTickInterval(2).build(null));
     public static final Item AMAKIRI=Registry.register(Registries.ITEM,Identifier.of("katana_combo","amakiri"),
         new SwordItem(ToolMaterials.NETHERITE,new Item.Settings().fireproof().rarity(net.minecraft.util.Rarity.EPIC)
-            .attributeModifiers(SwordItem.createAttributeModifiers(ToolMaterials.NETHERITE,3,-2.6f))));
+            .attributeModifiers(SwordItem.createAttributeModifiers(ToolMaterials.NETHERITE,3,-2.6f)
+                .with(EntityAttributes.PLAYER_ENTITY_INTERACTION_RANGE,new net.minecraft.entity.attribute.EntityAttributeModifier(Identifier.of("katana_combo","amakiri_reach"),.8,net.minecraft.entity.attribute.EntityAttributeModifier.Operation.ADD_VALUE),net.minecraft.component.type.AttributeModifierSlot.MAINHAND))));
     public static final Item EGG=Registry.register(Registries.ITEM,Identifier.of("katana_combo","raizen_spawn_egg"),
         new SpawnEggItem(TYPE,0x181725,0x68d9ff,new Item.Settings()));
     private static final TrackedData<Long> ATTACK_START=DataTracker.registerData(RaizenBoss.class,TrackedDataHandlerRegistry.LONG);

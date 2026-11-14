@@ -53,11 +53,26 @@ public final class ComboAnimation {
             float w=MathHelper.clamp(age/3,0,1);w=w*w*(3-2*w);
             float impulse=DefenseClient.impulse(player.getUuid(),client.world.getTime(),delta);
             float[] v={-1,5,-8,-25-impulse*20,65,6-impulse*8,18+impulse*12,-14,16,0.5f,-0.5f,-3,12};
-            return new Pose(v,w,age,new Vector3f(0,0,-1),-1);
+            return weaponPose(player,new Pose(v,w,age,new Vector3f(0,0,-1),-1));
         }
-        if(entity.isUsingItem() || state==null)return null;
-        return sampleAge(state.step(),Math.max(0,client.world.getTime()-state.started()+delta));
+        if(entity.isUsingItem())return null;
+        Pose technique=StormClient.pose(player,delta);if(technique!=null)return technique;
+        if(state==null){
+            if(entity.getMainHandStack().isOf(RaizenBoss.AMAKIRI) && player.getOffHandStack().isEmpty())
+                return amakiriIdle();
+            return null;
+        }
+        return weaponPose(player,sampleAge(state.step(),Math.max(0,client.world.getTime()-state.started()+delta)));
     }
+    private static Pose weaponPose(PlayerEntity player,Pose pose){
+        if(pose==null || !player.getMainHandStack().isOf(RaizenBoss.AMAKIRI) || !player.getOffHandStack().isEmpty())return pose;
+        Pose idle=amakiriIdle();float[] v=pose.values().clone();
+        for(int i=0;i<v.length;i++)v[i]=MathHelper.lerp(pose.weight(),idle.values()[i],v[i]);
+        Vector3f edge=new Vector3f(idle.cuttingDirection()).lerp(pose.cuttingDirection(),pose.weight());
+        if(edge.lengthSquared()<.00001f)edge.set(0,0,-1);else edge.normalize();
+        return new Pose(v,1,pose.age(),edge,pose.step());
+    }
+    public static Pose amakiriIdle(){return new Pose(new float[]{0,7,-7,55,28,0,9,-7,8,.2f,0,0,6},1,0,new Vector3f(0,0,-1),-2);}
     /** Shared analytical path for the visible blade and its trailing ribbon. */
     public static Pose sampleAge(int step,float age){
         int duration=ComboTiming.DURATION[step];

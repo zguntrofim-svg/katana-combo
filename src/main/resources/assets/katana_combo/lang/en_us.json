@@ -1,7 +1,20 @@
 {
   "item.katana_combo.kurotsuki": "Kurotsuki — Abyss Moon",
-  "itemGroup.katana_combo.katanas": "Katanas",
+  "itemGroup.katana_combo.katanas": "Millida: Arms & Armor",
   "entity.katana_combo.raizen": "Raizen — The Storm Shogun",
   "item.katana_combo.amakiri": "Amakiri — Heaven Splitter",
-  "item.katana_combo.raizen_spawn_egg": "Raizen Spawn Egg"
+  "item.katana_combo.raizen_spawn_egg": "Raizen Spawn Egg",
+  "item.katana_combo.storm_shogun_helmet": "Mask of Raizen",
+  "item.katana_combo.storm_shogun_chestplate": "Heart of the Storm",
+  "item.katana_combo.storm_shogun_leggings": "Cloud Shackles",
+  "item.katana_combo.storm_shogun_boots": "Lightning Treads",
+  "category.katana_combo.storm": "Millida — Amakiri",
+  "key.katana_combo.storm_0": "Thunder Arc",
+  "key.katana_combo.storm_1": "Heavenfall Slam",
+  "key.katana_combo.storm_2": "Judgment of Thunder",
+  "storm.katana_combo.short_0": "Arc",
+  "storm.katana_combo.short_1": "Slam",
+  "storm.katana_combo.short_2": "Judge",
+  "storm.katana_combo.ready": "Ready",
+  "storm.katana_combo.two_handed": "Empty offhand: two-handed grip. Hold use to guard."
 }

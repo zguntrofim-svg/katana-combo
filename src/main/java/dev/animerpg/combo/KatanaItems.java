@@ -14,7 +14,7 @@ public final class KatanaItems {
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.COMBAT).register(entries->entries.add(KUROTSUKI));
         Registry.register(Registries.ITEM_GROUP,Identifier.of("katana_combo","katanas"),FabricItemGroup.builder()
             .icon(()->new ItemStack(KUROTSUKI)).displayName(Text.translatable("itemGroup.katana_combo.katanas"))
-            .entries((context,entries)->entries.add(KUROTSUKI)).build());
+            .entries((context,entries)->{entries.add(KUROTSUKI);entries.add(RaizenBoss.AMAKIRI);for(Item item:StormItems.ARMOR)entries.add(item);}).build());
     }
     private KatanaItems(){}
 }

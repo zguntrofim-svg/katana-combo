@@ -33,6 +33,8 @@ public final class ComboMod implements ModInitializer {
     @Override public void onInitialize() {
         KatanaItems.init();
         RaizenBoss.init();
+        StormItems.init();
+        StormCombat.init();
         dev.animerpg.combo.temple.ThunderTempleStructure.init();
         EffectNetwork.init();
         HitImpact.init();
@@ -55,7 +57,7 @@ public final class ComboMod implements ModInitializer {
         });
     }
     private static void request(ServerPlayerEntity p) {
-        if (!eligible(p) || !p.isAlive() || p.isUsingItem()) return;
+        if (!eligible(p) || !p.isAlive() || p.isUsingItem() || StormCombat.isCasting(p)) return;
         Attack a = ATTACKS.computeIfAbsent(p.getUuid(), ignored -> new Attack());
         long now = p.getServerWorld().getTime();
         if (a.active) {
@@ -104,14 +106,18 @@ public final class ComboMod implements ModInitializer {
         p.setVelocity(velocity);p.velocityModified=true;
         p.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket(p));
     }
+    public static boolean canHit(ServerPlayerEntity p,LivingEntity target){
+        return target!=p && target.isAlive() && !target.isSpectator() && target.getWorld()==p.getWorld()
+            && p.canSee(target) && p.canTarget(target)
+            && (!(target instanceof ServerPlayerEntity other) || p.shouldDamagePlayer(other));
+    }
     private static void hit(ServerPlayerEntity p, Attack a) {
-        double reach = Math.min(3.0, p.getEntityInteractionRange());
+        double reach = Math.min(p.getMainHandStack().isOf(RaizenBoss.AMAKIRI)?3.8:3.0, p.getEntityInteractionRange());
         Vec3d eye = p.getEyePos(), look = p.getRotationVec(1f);
         if(a.counter)look=new Vec3d(look.x,-0.55,look.z).normalize();
         for (LivingEntity target : p.getServerWorld().getEntitiesByClass(LivingEntity.class,
                 p.getBoundingBox().expand(reach), e -> e != p && e.isAlive() && !e.isSpectator())) {
-            if (a.hit.contains(target.getId()) || !p.canSee(target) || !p.canTarget(target)) continue;
-            if (target instanceof ServerPlayerEntity other && !p.shouldDamagePlayer(other)) continue;
+            if (a.hit.contains(target.getId()) || !canHit(p,target)) continue;
             Vec3d closest = new Vec3d(
                 net.minecraft.util.math.MathHelper.clamp(eye.x, target.getBoundingBox().minX, target.getBoundingBox().maxX),
                 net.minecraft.util.math.MathHelper.clamp(eye.y, target.getBoundingBox().minY, target.getBoundingBox().maxY),

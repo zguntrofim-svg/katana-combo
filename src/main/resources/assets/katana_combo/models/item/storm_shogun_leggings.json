@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "katana_combo:item/storm_shogun_leggings"
+  }
+}
