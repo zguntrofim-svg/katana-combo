@@ -52,9 +52,11 @@ public final class EffectScreen extends Screen {
                 double curve=Math.sin(t*Math.PI)*.30;
                 if(style==EffectStyle.VOID)curve+=Math.sin(t*16+time*.8)*.045;
                 int yy=y+(int)(h*(.72-curve))-(int)(layer*h*.11);
-                int thickness=Math.max(1,(int)(h*.12*Math.sin(Math.PI*t)*(1-t*.5)));
-                float fade=(float)Math.sin(t*Math.PI);int alpha=(int)(fade*(layer==0?185:65));
+                int thickness=Math.max(1,(int)(h*.16*Math.sin(Math.PI*t)*(1-t*.5)));
+                float fade=(float)Math.pow(Math.max(0,Math.sin(t*Math.PI)),0.55);int alpha=(int)(fade*(layer==0?235:105));
                 int color=(alpha<<24)|style.color;
+                draw.fill(xx,yy-thickness*3-2,xx+Math.max(2,w/65),yy+thickness*3+3,((int)(fade*20)<<24)|style.color);
+                draw.fill(xx,yy-thickness*2-1,xx+Math.max(2,w/65),yy+thickness*2+2,((int)(fade*44)<<24)|style.color);
                 draw.fill(xx,yy-thickness,xx+Math.max(2,w/65),yy+thickness+1,color);
                 if(layer==0){
                     draw.fill(xx,yy-thickness,xx+Math.max(2,w/65),yy-thickness+1,((int)(fade*245)<<24)|style.edge);
