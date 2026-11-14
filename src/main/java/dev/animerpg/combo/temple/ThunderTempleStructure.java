@@ -25,12 +25,17 @@ public final class ThunderTempleStructure extends Structure {
         // Build the read-only plan once during startup, not in a running world's generation task.
         TempleBlueprint.COLUMNS.size();
         TemplePlacement.init();
+        TempleSearch.init();
     }
     public ThunderTempleStructure(Config config){super(config);}
     @Override protected Optional<StructurePosition> getStructurePosition(Context context){
         int x=context.chunkPos().getCenterX(),z=context.chunkPos().getCenterZ(),low=Integer.MAX_VALUE,high=Integer.MIN_VALUE;
-        for(int dx=-56;dx<=56;dx+=14)for(int dz=-56;dz<=56;dz+=14){
-            if(!TempleBlueprint.footprint(dx,dz))continue;
+        // Reject other biomes before costly height/noise queries (also used by locate).
+        if(!context.biomePredicate().test(context.biomeSource().getBiome(x>>2,40,z>>2,context.noiseConfig().getMultiNoiseSampler())))return Optional.empty();
+        int center=context.chunkGenerator().getHeightOnGround(x,z,Heightmap.Type.WORLD_SURFACE_WG,context.world(),context.noiseConfig());
+        if(center<110 || center+TempleBlueprint.HEIGHT+3>=context.world().getTopY())return Optional.empty();
+        low=high=center;
+        for(int dx:new int[]{-42,42})for(int dz:new int[]{-42,42}){
             int h=context.chunkGenerator().getHeightOnGround(x+dx,z+dz,Heightmap.Type.WORLD_SURFACE_WG,context.world(),context.noiseConfig());
             low=Math.min(low,h);high=Math.max(high,h);
         }

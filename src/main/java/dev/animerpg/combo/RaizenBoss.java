@@ -22,9 +22,10 @@ import java.util.UUID;
 import net.minecraft.util.math.Box;
 
 public final class RaizenBoss extends HostileEntity {
+    // Mod entities have no vanilla DFU schema; null follows FabricEntityTypeBuilder and preserves saving.
     public static final EntityType<RaizenBoss> TYPE=Registry.register(Registries.ENTITY_TYPE,Identifier.of("katana_combo","raizen"),
         EntityType.Builder.create(RaizenBoss::new,SpawnGroup.MONSTER).dimensions(1.45f,3.5f).eyeHeight(3.05f)
-            .maxTrackingRange(12).trackingTickInterval(2).build("katana_combo:raizen"));
+            .maxTrackingRange(12).trackingTickInterval(2).build(null));
     public static final Item AMAKIRI=Registry.register(Registries.ITEM,Identifier.of("katana_combo","amakiri"),
         new SwordItem(ToolMaterials.NETHERITE,new Item.Settings().fireproof().rarity(net.minecraft.util.Rarity.EPIC)
             .attributeModifiers(SwordItem.createAttributeModifiers(ToolMaterials.NETHERITE,3,-2.6f))));

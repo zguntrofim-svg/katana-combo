@@ -17,6 +17,8 @@ import org.joml.Vector3f;
 /** Native baked quads: curved bevels and faceted details without a renderer or animation library. */
 public final class KatanaModel implements BakedModel {
     private record Face(float[][] p,int tile,String group){}
+    // The model loader discovers every models/*.json: custom geometry must live in a valid object.
+    private record Mesh(Face[] millida_mesh){}
     private final BakedModel base;
     private final List<BakedQuad> quads;
     public static void init(){
@@ -36,8 +38,8 @@ public final class KatanaModel implements BakedModel {
         this.base=base;
         List<BakedQuad> result=new ArrayList<>();
         try(var stream=KatanaModel.class.getResourceAsStream(resource)){
-            if(stream==null)throw new IllegalStateException("Missing Kurotsuki mesh");
-            Face[] faces=new Gson().fromJson(new InputStreamReader(stream,StandardCharsets.UTF_8),Face[].class);
+            if(stream==null)throw new IllegalStateException("Missing mesh "+resource);
+            Face[] faces=new Gson().fromJson(new InputStreamReader(stream,StandardCharsets.UTF_8),Mesh.class).millida_mesh();
             for(Face face:faces){
                 // Half-turn around the canonical hilt-to-tip diagonal, not around the hand or camera.
                 // Keep points on that axis fixed: only the cutting edge / spine and front / back swap.

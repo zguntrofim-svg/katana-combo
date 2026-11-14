@@ -21,15 +21,20 @@ public final class TemplePlacement {
         Blocks.GRANITE,Blocks.DIORITE,Blocks.ANDESITE,Blocks.GRAVEL,Blocks.DIRT,Blocks.GRASS_BLOCK,Blocks.COARSE_DIRT,
         Blocks.ROOTED_DIRT,Blocks.PODZOL,Blocks.MOSS_BLOCK,Blocks.MOSS_CARPET,Blocks.SNOW,Blocks.SNOW_BLOCK,
         Blocks.POWDER_SNOW,Blocks.ICE,Blocks.PACKED_ICE,Blocks.BLUE_ICE,Blocks.SHORT_GRASS,Blocks.TALL_GRASS,
-        Blocks.FERN,Blocks.LARGE_FERN,Blocks.DEAD_BUSH,Blocks.DANDELION,Blocks.POPPY,Blocks.BROWN_MUSHROOM,Blocks.RED_MUSHROOM);
+        Blocks.FERN,Blocks.LARGE_FERN,Blocks.DEAD_BUSH,Blocks.DANDELION,Blocks.POPPY,Blocks.BROWN_MUSHROOM,Blocks.RED_MUSHROOM,
+        Blocks.COAL_ORE,Blocks.DEEPSLATE_COAL_ORE,Blocks.IRON_ORE,Blocks.DEEPSLATE_IRON_ORE,
+        Blocks.COPPER_ORE,Blocks.DEEPSLATE_COPPER_ORE,Blocks.GOLD_ORE,Blocks.DEEPSLATE_GOLD_ORE,
+        Blocks.EMERALD_ORE,Blocks.DEEPSLATE_EMERALD_ORE,Blocks.LAPIS_ORE,Blocks.DEEPSLATE_LAPIS_ORE,
+        Blocks.REDSTONE_ORE,Blocks.DEEPSLATE_REDSTONE_ORE,Blocks.DIAMOND_ORE,Blocks.DEEPSLATE_DIAMOND_ORE,
+        Blocks.RAW_IRON_BLOCK,Blocks.RAW_COPPER_BLOCK);
     private static boolean safe(BlockState state){return !state.hasBlockEntity() && (state.isAir() || NATURAL.contains(state.getBlock()));}
     public static void init(){
         CommandRegistrationCallback.EVENT.register((dispatcher,access,environment)->dispatcher.register(literal("millida")
-            .requires(source->source.hasPermissionLevel(2)).then(literal("temple")
+            .then(literal("temple").requires(source->source.hasPermissionLevel(2))
                 .then(literal("spawn").executes(context->start(context.getSource())))
                 .then(literal("cancel").executes(context->{
                     var job=JOBS.remove(context.getSource().getWorld());
-                    if(job==null){context.getSource().sendError(Text.literal("Нет активного размещения храма."));return 0;}
+                    if(job==null)return TempleSearch.cancel(context.getSource());
                     job.close();job.message("Размещение остановлено. Уже поставленные блоки сохранены.");return 1;
                 })))));
         ServerTickEvents.END_SERVER_TICK.register(server->{
@@ -64,6 +69,7 @@ public final class TemplePlacement {
         final List<TempleBlueprint.Column> columns=TempleBlueprint.COLUMNS;
         final int[] surfaces=new int[columns.size()];
         final List<ChunkPos> chunks;final List<ChunkPos> tickets=new ArrayList<>();
+        final Set<BlockBox> existingStructures=new HashSet<>();
         CompletableFuture<OptionalChunk<Chunk>> pending;
         int stage,chunkIndex,index,y=Integer.MIN_VALUE,voxelIndex,base,low=Integer.MAX_VALUE,high=Integer.MIN_VALUE;
         int lastProgress=-1;boolean foundation;
@@ -75,6 +81,9 @@ public final class TemplePlacement {
         void message(String text){source.sendFeedback(()->Text.literal(text),false);}
         boolean fail(String text){source.sendError(Text.literal(text+" Переместись в другой участок гор и повтори команду."));return true;}
         void close(){for(var pos:tickets)world.getChunkManager().removeTicket(TICKET,pos,0,pos);tickets.clear();}
+        void rememberStructures(Chunk chunk){
+            for(var start:chunk.getStructureStarts().values())if(start.hasChildren())existingStructures.add(start.getBoundingBox());
+        }
         boolean tick(){
             if(stage==0){
                 // One asynchronous chunk request at a time. Keep surveyed chunks resident until completion.
@@ -87,8 +96,13 @@ public final class TemplePlacement {
                     var result=pending.getNow(null);
                     if(result==null || !result.isPresent())return fail("Не удалось загрузить участок.");
                     Chunk chunk=result.orElse(null);
-                    if(chunk.hasStructureReferences() || chunk.getStructureStarts().values().stream().anyMatch(s->s.hasChildren()))
-                        return fail("На участке обнаружена существующая структура Minecraft.");
+                    rememberStructures(chunk);
+                    // Read starts only if already loaded: a reference may point to a distant or underground structure.
+                    for(var references:chunk.getStructureReferences().values())for(long packed:references){
+                        ChunkPos start=new ChunkPos(packed);
+                        var loaded=world.getChunkManager().getWorldChunk(start.x,start.z);
+                        if(loaded!=null)rememberStructures(loaded);
+                    }
                     pending=null;chunkIndex++;return false;
                 }
                 stage=1;message("Чанки загружены. Измеряю рельеф и проверяю существующие блоки.");
@@ -100,6 +114,9 @@ public final class TemplePlacement {
                     if(stage==1){
                         base=high+2;
                         if(base+TempleBlueprint.HEIGHT>=world.getTopY() || base-low>96)return fail("Рельеф слишком крутой или храм не помещается по высоте.");
+                        BlockBox affected=new BlockBox(x-60,Math.max(world.getBottomY(),low-4),z-60,x+59,base+TempleBlueprint.HEIGHT,z+59);
+                        if(existingStructures.stream().anyMatch(box->box.intersects(affected)))
+                            return fail("На участке есть структура, пересекающая объём строительства.");
                         stage=2;index=0;y=Integer.MIN_VALUE;continue;
                     }
                     if(stage==2){stage=3;index=0;y=Integer.MIN_VALUE;message("Участок свободен. Строю храм небольшими порциями; не ставь здесь блоки до завершения.");continue;}
