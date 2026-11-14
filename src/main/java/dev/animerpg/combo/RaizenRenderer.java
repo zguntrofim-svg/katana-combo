@@ -14,6 +14,7 @@ public final class RaizenRenderer extends MobEntityRenderer<RaizenBoss,RaizenMod
                 getContextModel().weapon(matrices,vertices.getBuffer(RenderLayer.getEntityCutoutNoCull(WEAPON)),light);
                 getContextModel().glow(matrices,vertices.getBuffer(RenderLayer.getEyes(SKIN)));
                 getContextModel().weaponGlow(matrices,vertices.getBuffer(RenderLayer.getEyes(WEAPON)));
+                RaizenEffects.render(matrices,vertices,boss,delta);
             }
         });
     }

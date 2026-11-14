@@ -36,22 +36,20 @@ public final class RaizenModel extends EntityModel<RaizenBoss> {
     private static float smooth(float t){t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);}
     @Override public void setAngles(RaizenBoss entity,float limb,float distance,float progress,float headYaw,float headPitch){
         float delta=Math.max(0,Math.min(1,progress-entity.age));float age=entity.attackAge(delta);
-        float raise=age<0?0:smooth(age/8),strike=age<0?0:smooth((age-9)/4),recover=age<0?0:smooth((age-16)/8);
-        float attack=raise*(1-recover);
-        torso.yaw=.16f*(1-strike*attack);torso.pitch=.035f+(.16f*strike-.11f)*attack;
-        torso.pivotY=(float)Math.sin(progress*.08f)*.18f;
-        head.yaw=headYaw*(float)Math.PI/180*.6f;head.pitch=headPitch*(float)Math.PI/180*.45f;
-        Vector3f axis=new Vector3f(.76f,-.54f,-.36f).normalize();
-        Vector3f lifted=new Vector3f(.15f,-.98f,.10f).normalize();
-        Vector3f down=new Vector3f(.12f,.54f,-.83f).normalize();
-        Vector3f active=new Vector3f(lifted).lerp(down,strike).normalize();
-        axis.lerp(active,attack).normalize();
-        Vector3f center=new Vector3f(-1,-6,-11);
-        Vector3f loaded=new Vector3f(0,-22,-3).lerp(new Vector3f(0,-7,-9),strike);
-        center.lerp(loaded,attack);
-        Quaternionf body=new Quaternionf().rotationYXZ(torso.yaw,torso.pitch,0);
-        axis.rotate(body);center.rotate(body).add(0,torso.pivotY,0);
-        Quaternionf weaponRotation=new Quaternionf().rotationTo(new Vector3f(0,1,0),axis);
+        int type=entity.action();
+        RaizenMotion.Pose pose=RaizenMotion.sample(type,age);float[] v=pose.v();
+        float moving=Math.min(1,distance*2),walk=(float)Math.sin(limb*.65f);
+        float breath=(float)Math.sin(progress*6.283185f/60)*.16f;
+        torso.yaw=RaizenMotion.rad(v[5]);torso.pitch=RaizenMotion.rad(v[6]);torso.roll=RaizenMotion.rad(v[7])+(type==0?walk*moving*.025f:0);
+        torso.pivotY=v[8]+breath+(type==0?Math.abs(walk)*moving*.40f:0);
+        Quaternionf body=new Quaternionf().rotationZYX(torso.roll,torso.yaw,torso.pitch);
+        Vector3f neck=new Vector3f(0,-21,0).rotate(body).add(0,torso.pivotY,0);
+        head.pivotX=neck.x;head.pivotY=neck.y;head.pivotZ=neck.z;
+        head.yaw=headYaw*(float)Math.PI/180*.55f+torso.yaw*.2f;
+        head.pitch=headPitch*(float)Math.PI/180*.35f+RaizenMotion.rad(v[10]);
+        Vector3f axis=pose.axis().rotate(body);
+        Vector3f center=pose.center().rotate(body).add(0,torso.pivotY,0);
+        Quaternionf weaponRotation=RaizenMotion.weaponRotation(type,age,axis,body);
         Vector3f base=new Vector3f(center).fma(-17.5f,axis);
         weapon.pivotX=base.x;weapon.pivotY=base.y;weapon.pivotZ=base.z;rotate(weapon,weaponRotation);
         Vector3f rear=new Vector3f(REAR_SOCKET).rotate(weaponRotation).add(base);
@@ -60,11 +58,13 @@ public final class RaizenModel extends EntityModel<RaizenBoss> {
         arm("left",new Vector3f(10,-15,0).rotate(body).add(0,torso.pivotY,0),front,weaponRotation,1);
         for(int i=0;i<2;i++){
             var leg=root.getChild(i==0?"right_leg":"left_leg");
-            leg.roll=i==0?.21f:-.21f;leg.pitch=-.14f+(float)Math.sin(limb*.65f+(i==0?0:Math.PI))*Math.min(.30f,distance*.5f);
-            leg.getChild("shin").pitch=.28f;
+            float step=(float)Math.sin(limb*.65f+(i==0?0:Math.PI));
+            leg.roll=(i==0?1:-1)*v[9];
+            leg.pitch=-.14f+(type==0?step*moving*.38f:type==RaizenMotion.DASH && age>5 && age<17?step*.30f:0);
+            leg.getChild("shin").pitch=.28f+Math.max(0,step)*moving*.20f+v[8]*.06f;
         }
-        var cape=root.getChild("cape");cape.yaw=torso.yaw*.4f;
-        for(int i=0;i<9;i++)cape.getChild("cape_strip_"+i).pitch=.10f+(float)Math.sin(progress*.09f+i*.55f)*.055f+Math.min(.25f,distance*.18f);
+        var cape=root.getChild("cape");cape.yaw=torso.yaw*.4f;cape.pivotY=-17+torso.pivotY;
+        for(int i=0;i<9;i++)cape.getChild("cape_strip_"+i).pitch=.10f+(float)Math.sin(progress*.09f+i*.55f)*.055f+Math.min(.25f,distance*.18f)+(type==RaizenMotion.DASH?.28f:0)+(type==RaizenMotion.TRANSITION?(float)Math.sin(progress*.45f+i)*.08f:0);
         weapon.getChild("tassel").roll=(float)Math.sin(progress*.12f)*.10f;
     }
     private void arm(String side,Vector3f shoulder,Vector3f grip,Quaternionf weaponRotation,float sign){
@@ -72,7 +72,9 @@ public final class RaizenModel extends EntityModel<RaizenBoss> {
         Vector3f direction=new Vector3f(wrist).sub(shoulder);float d=direction.length();direction.div(Math.max(.001f,d));
         float upper=12,lower=11;
         float along=(d*d+upper*upper-lower*lower)/(2*Math.max(.001f,d));along=Math.max(0,Math.min(upper,along));
-        Vector3f pole=new Vector3f(sign,.1f,.75f);pole.fma(-pole.dot(direction),direction).normalize();
+        Vector3f pole=new Vector3f(sign,.1f,.75f);pole.fma(-pole.dot(direction),direction);
+        if(pole.lengthSquared()<.0001f)pole.set(0,0,1).fma(-direction.z,direction);
+        pole.normalize();
         Vector3f elbow=new Vector3f(shoulder).fma(along,direction).fma((float)Math.sqrt(Math.max(0,upper*upper-along*along)),pole);
         segment(root.getChild(side+"_upper"),shoulder,elbow,upper);
         segment(root.getChild(side+"_lower"),elbow,wrist,lower);

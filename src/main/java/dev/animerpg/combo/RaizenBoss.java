@@ -28,7 +28,11 @@ public final class RaizenBoss extends HostileEntity {
         new SpawnEggItem(TYPE,0x181725,0x68d9ff,new Item.Settings()));
     private static final TrackedData<Long> ATTACK_START=DataTracker.registerData(RaizenBoss.class,TrackedDataHandlerRegistry.LONG);
     private final ServerBossBar bar=new ServerBossBar(Text.translatable("entity.katana_combo.raizen"),BossBar.Color.BLUE,BossBar.Style.NOTCHED_10);
-    private int cooldown;
+    private static final TrackedData<Integer> ACTION=DataTracker.registerData(RaizenBoss.class,TrackedDataHandlerRegistry.INTEGER);
+    private static final TrackedData<Boolean> PHASE_TWO=DataTracker.registerData(RaizenBoss.class,TrackedDataHandlerRegistry.BOOLEAN);
+    private int cooldown,sequence;
+    private boolean transitionUsed;
+    private float actionYaw;
     public static void init(){
         FabricDefaultAttributeRegistry.register(TYPE,HostileEntity.createHostileAttributes()
             .add(EntityAttributes.GENERIC_MAX_HEALTH,360).add(EntityAttributes.GENERIC_ARMOR,18)
@@ -42,8 +46,25 @@ public final class RaizenBoss extends HostileEntity {
         super(type,world);experiencePoints=80;setPersistent();
         equipStack(EquipmentSlot.MAINHAND,new ItemStack(AMAKIRI));setEquipmentDropChance(EquipmentSlot.MAINHAND,0);
     }
-    @Override protected void initDataTracker(DataTracker.Builder builder){super.initDataTracker(builder);builder.add(ATTACK_START,-1L);}
+    @Override protected void initDataTracker(DataTracker.Builder builder){super.initDataTracker(builder);builder.add(ATTACK_START,-1L);builder.add(ACTION,0);builder.add(PHASE_TWO,false);}
     public float attackAge(float delta){long start=dataTracker.get(ATTACK_START);return start<0?-1:Math.max(0,getWorld().getTime()-start+delta);}
+    public int action(){return dataTracker.get(ACTION);}
+    public boolean phaseTwo(){return dataTracker.get(PHASE_TWO);}
+    private void beginAction(int type){
+        dataTracker.set(ACTION,type);dataTracker.set(ATTACK_START,getWorld().getTime());
+        var target=getTarget();
+        if(target!=null){var d=target.getPos().subtract(getPos());actionYaw=(float)(Math.atan2(-d.x,d.z)*180/Math.PI);}else actionYaw=getYaw();
+        setYaw(actionYaw);setBodyYaw(actionYaw);getNavigation().stop();
+        cooldown=type==RaizenMotion.TRANSITION?68:(int)((RaizenMotion.duration(type)+18)*(phaseTwo()?.8f:1));
+    }
+    private void enterPhaseTwo(){
+        dataTracker.set(PHASE_TWO,true);transitionUsed=true;
+        getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED).setBaseValue(.26);
+        getAttributeInstance(EntityAttributes.GENERIC_ATTACK_DAMAGE).setBaseValue(8);
+        bar.setColor(BossBar.Color.PURPLE);
+    }
+    @Override public void writeCustomDataToNbt(net.minecraft.nbt.NbtCompound nbt){super.writeCustomDataToNbt(nbt);nbt.putBoolean("StormPhaseTwo",phaseTwo());}
+    @Override public void readCustomDataFromNbt(net.minecraft.nbt.NbtCompound nbt){super.readCustomDataFromNbt(nbt);if(nbt.getBoolean("StormPhaseTwo"))enterPhaseTwo();}
     @Override protected void initGoals(){
         goalSelector.add(0,new SwimGoal(this));
         goalSelector.add(2,new Goal(){
@@ -52,11 +73,13 @@ public final class RaizenBoss extends HostileEntity {
             public boolean shouldRunEveryTick(){return true;}
             public void tick(){
                 var target=getTarget();if(target==null)return;
-                getLookControl().lookAt(target,18,18);
                 if(attackAge(0)>=0){getNavigation().stop();return;}
+                getLookControl().lookAt(target,18,18);
                 getNavigation().startMovingTo(target,1);
-                if(cooldown<=0 && squaredDistanceTo(target)<=16 && canSee(target)){
-                    dataTracker.set(ATTACK_START,getWorld().getTime());cooldown=42;getNavigation().stop();
+                if(cooldown<=0 && canSee(target)){
+                    double distance=squaredDistanceTo(target);
+                    if(distance>17.64 && distance<=70.56)beginAction(RaizenMotion.DASH);
+                    else if(distance<=17.64)beginAction(sequence++%2==0?RaizenMotion.HORIZONTAL:RaizenMotion.SLAM);
                 }
             }
             public void stop(){getNavigation().stop();}
@@ -72,15 +95,31 @@ public final class RaizenBoss extends HostileEntity {
             if(cooldown>0)cooldown--;
             bar.setPercent(getHealth()/getMaxHealth());
             if(hasCustomName())bar.setName(getDisplayName());
-            float age=attackAge(0);
-            if(age==12){
-                var target=getTarget();
-                if(target!=null && target.isAlive() && squaredDistanceTo(target)<=16 && canSee(target)){
-                    var offset=target.getPos().subtract(getPos()).multiply(1,0,1).normalize();
-                    if(getRotationVec(1).multiply(1,0,1).normalize().dotProduct(offset)>.25)tryAttack(target);
+            if(!isAlive()){dataTracker.set(ACTION,0);dataTracker.set(ATTACK_START,-1L);getNavigation().stop();return;}
+            if(!transitionUsed && isAlive() && getHealth()<=getMaxHealth()*.5f){transitionUsed=true;beginAction(RaizenMotion.TRANSITION);}
+            float age=attackAge(0);int type=action();
+            if(age>=0){
+                setYaw(actionYaw);setBodyYaw(actionYaw);getNavigation().stop();
+                if(type==RaizenMotion.DASH && age>=7 && age<=13 && !isTouchingWater() && isOnGround()){
+                    double angle=Math.toRadians(actionYaw),speed=phaseTwo()?.68:.56;
+                    move(MovementType.SELF,new net.minecraft.util.math.Vec3d(-Math.sin(angle)*speed,0,Math.cos(angle)*speed));
+                }
+                if(age==RaizenMotion.hit(type)){
+                    double reach=type==RaizenMotion.HORIZONTAL?4.5:4.2;
+                    for(var target:getWorld().getEntitiesByClass(net.minecraft.entity.LivingEntity.class,getBoundingBox().expand(reach,1.5,reach),
+                            e->e!=this && e.isAlive() && (e==getTarget() || e instanceof PlayerEntity))){
+                        if(target instanceof PlayerEntity p && (p.isCreative() || p.isSpectator()))continue;
+                        if(squaredDistanceTo(target)>reach*reach || !canSee(target) || !canTarget(target))continue;
+                        var offset=target.getPos().subtract(getPos()).multiply(1,0,1).normalize();
+                        double cone=type==RaizenMotion.HORIZONTAL?-.15:.45;
+                        if(getRotationVec(1).multiply(1,0,1).normalize().dotProduct(offset)>cone)tryAttack(target);
+                    }
+                }
+                if(age>=RaizenMotion.duration(type)){
+                    if(type==RaizenMotion.TRANSITION){enterPhaseTwo();cooldown=18;}
+                    dataTracker.set(ACTION,0);dataTracker.set(ATTACK_START,-1L);
                 }
             }
-            if(age>=24)dataTracker.set(ATTACK_START,-1L);
         }
     }
     @Override public void onStartedTrackingBy(ServerPlayerEntity player){super.onStartedTrackingBy(player);bar.addPlayer(player);}
