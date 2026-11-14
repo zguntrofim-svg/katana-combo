@@ -15,10 +15,12 @@ public final class TempleBlueprint {
         RED=Blocks.RED_NETHER_BRICKS.getDefaultState(), SILVER=Blocks.POLISHED_ANDESITE.getDefaultState(),
         LIGHT=Blocks.SEA_LANTERN.getDefaultState(), GLASS=Blocks.CYAN_STAINED_GLASS.getDefaultState();
     private final Map<Integer,TreeMap<Integer,BlockState>> cells=new HashMap<>();
+    private final Set<Integer> footings=new HashSet<>();
     public static final List<Column> COLUMNS=new TempleBlueprint().build();
     public static boolean footprint(int x,int z){
         if(Math.abs(x)<=5 && z>=36 && z<=59)return true;
         if(Math.abs(x)<=46 && z>=-51 && z<=-26)return true;
+        if(Math.abs(x)<=41 && z>=26 && z<=41)return true;
         double ripple=Math.sin(x*.24)*.025+Math.sin(z*.31)*.02;
         return x*x/(58.0*58)+(z+6.0)*(z+6)/(57.0*57)<=1+ripple;
     }
@@ -38,8 +40,16 @@ public final class TempleBlueprint {
     private void box(int x0,int y0,int z0,int x1,int y1,int z1,BlockState b){
         for(int x=x0;x<=x1;x++)for(int z=z0;z<=z1;z++)for(int y=y0;y<=y1;y++)put(x,y,z,b);
     }
+    private void footing(int x0,int z0,int x1,int z1,int top){
+        for(int x=x0;x<=x1;x++)for(int z=z0;z<=z1;z++){
+            if(x<MIN || x>MAX || z<MIN || z>MAX)continue;
+            footings.add((x-MIN)*120+z-MIN);
+            for(int y=0;y<=top;y++)put(x,y,z,y==top?STONE:DARK);
+        }
+    }
     private void stairs(int x,int y,int z,Block b,Direction facing){put(x,y,z,b.getDefaultState().with(Properties.HORIZONTAL_FACING,facing));}
     private void lamp(int x,int y,int z){
+        footing(x,z,x,z,y-1);
         block(x,y,z,Blocks.CHISELED_STONE_BRICKS);block(x,y+1,z,Blocks.STONE_BRICK_WALL);
         block(x,y+2,z,Blocks.SHROOMLIGHT);block(x,y+3,z,Blocks.DEEPSLATE_TILE_SLAB);
         for(Direction d:Direction.Type.HORIZONTAL)put(x+d.getOffsetX(),y+2,z+d.getOffsetZ(),Blocks.DARK_OAK_TRAPDOOR.getDefaultState().with(Properties.HORIZONTAL_FACING,d).with(Properties.OPEN,true));
@@ -51,22 +61,24 @@ public final class TempleBlueprint {
     private void roof(int cx,int y,int cz,int halfX,int halfZ,boolean ruined){
         // Solid paired slopes, rising ridge, and double lifted eaves; all walkable real stair blocks.
         for(int x=-halfX;x<=halfX;x++)for(int z=-halfZ;z<=halfZ;z++){
-            if(ruined && x>halfX/3 && z<-halfZ/3 && (x*7-z*3)%9!=0)continue;
+            if(ruined && x>halfX/3 && z<-halfZ/3)continue;
             int rise=(halfZ-Math.abs(z))/2;
             int up=Math.abs(x)>halfX-3?1:0;
             if(Math.abs(z)>=halfZ-1)up++;
             int yy=y+rise+up;
             stairs(cx+x,yy,cz+z,Blocks.DEEPSLATE_TILE_STAIRS,z<=0?Direction.SOUTH:Direction.NORTH);
-            if(Math.abs(z)==halfZ || Math.abs(x)==halfX)put(cx+x,yy-1,cz+z,WOOD);
+            put(cx+x,yy-1,cz+z,WOOD);
             if(z==0)block(cx+x,yy+1,cz,Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
         }
         for(int side:new int[]{-1,1}){
             int xx=cx+side*halfX;
-            for(int j=0;j<3;j++)block(xx-side*j,y+halfZ/2+2+j/2,cz,Blocks.GILDED_BLACKSTONE);
+            for(int j=0;j<3;j++)box(xx-side*j,y+halfZ/2+1,cz,xx-side*j,y+halfZ/2+2+j/2,cz,Blocks.GILDED_BLACKSTONE.getDefaultState());
             block(xx,y+halfZ/2+3,cz,Blocks.LIGHTNING_ROD);
         }
     }
     private void hall(int cx,int y,int cz,int hx,int hz,boolean ruin){
+        if(y<=14)footing(cx-hx-1,cz-hz,cx+hx+1,cz+hz,y-1);
+        box(cx-hx-1,y,cz-hz,cx+hx+1,y,cz+hz,WOOD);
         box(cx-hx,y,cz-hz,cx+hx,y,cz+hz,WOOD);
         box(cx-hx+1,y+1,cz-hz+1,cx+hx-1,y+8,cz+hz-1,Blocks.AIR.getDefaultState());
         for(int dx=-hx;dx<=hx;dx+=Math.max(1,hx/2))for(int dz:new int[]{-hz,hz}){
@@ -84,7 +96,10 @@ public final class TempleBlueprint {
         box(cx-hx,y+8,cz-hz,cx+hx,y+8,cz-hz,RED);
         box(cx-hx,y+8,cz+hz,cx+hx,y+8,cz+hz,RED);
         roof(cx,y+9,cz,hx+3,hz+3,ruin);
-        for(int dx:new int[]{-hx+1,hx-1})block(cx+dx,y+6,cz+hz+1,Blocks.LANTERN);
+        for(int dx:new int[]{-hx+1,hx-1}){
+            box(cx+dx,y+7,cz+hz+1,cx+dx,y+8,cz+hz+1,Blocks.CHAIN.getDefaultState());
+            put(cx+dx,y+6,cz+hz+1,Blocks.LANTERN.getDefaultState().with(Properties.HANGING,true));
+        }
         // Roofed side balconies with rail openings toward the central approach.
         for(int dx:new int[]{-hx-1,hx+1})for(int z=-hz;z<=hz;z++)block(cx+dx,y+1,cz+z,Blocks.DARK_OAK_FENCE);
     }
@@ -98,6 +113,7 @@ public final class TempleBlueprint {
         box(cx-half-3,y+12,cz-1,cx+half+3,y+12,cz+1,RED);
         for(int x=-half-4;x<=half+4;x++){
             int rise=Math.abs(x)>half+1?1:0;
+            if(rise>0)put(cx+x,y+12+rise,cz,DARK);
             block(cx+x,y+13+rise,cz,Blocks.DEEPSLATE_TILE_SLAB);
         }
         box(cx-1,y+8,cz,cx+1,y+11,cz,Blocks.WARPED_PLANKS.getDefaultState());
@@ -105,6 +121,7 @@ public final class TempleBlueprint {
         block(cx,y+9,cz+1,Blocks.LIGHT_BLUE_STAINED_GLASS);
     }
     private void crystal(int x,int y,int z,int height){
+        footing(x-1,z-1,x+1,z+1,y-1);
         box(x-1,y,z-1,x+1,y+1,z+1,DARK);
         for(int i=2;i<height;i++){
             block(x,y+i,z,Blocks.SEA_LANTERN);block(x+1,y+i,z,Blocks.CYAN_STAINED_GLASS);
@@ -114,17 +131,19 @@ public final class TempleBlueprint {
     }
     private void altar(int x,int y,int z,boolean main){
         int r=main?5:3;
+        footing(x-r-1,z-r-1,x+r+1,z+r+1,y-1);
         box(x-r-1,y,z-r-1,x+r+1,y,z+r+1,DARK);
         box(x-r,y+1,z-r,x+r,y+1,z+r,SILVER);
         box(x-2,y+2,z-2,x+2,y+2,z+2,TILE);
         put(x,y+3,z,LIGHT);put(x,y+4,z,GLASS);
         for(int dx:new int[]{-r,r})for(int dz:new int[]{-r,r}){
-            pillar(x+dx,y+1,z+dz,3);block(x+dx,y+5,z+dz,Blocks.SOUL_LANTERN);
+            pillar(x+dx,y+1,z+dz,main?3:6);if(main)block(x+dx,y+5,z+dz,Blocks.SOUL_LANTERN);
         }
         for(int i=-r;i<=r;i++){put(x+i,y+1,z,LIGHT);put(x,y+1,z+i,LIGHT);}
         if(!main)roof(x,y+7,z,r+2,r+1,false);
     }
     private void statue(int x,int y,int z,boolean broken){
+        footing(x-4,z-3,x+4,z+3,y-1);
         box(x-4,y,z-3,x+4,y+1,z+3,DARK);
         box(x-3,y+2,z-2,x-1,y+6,z+2,SILVER);box(x+1,y+2,z-2,x+3,y+6,z+2,SILVER);
         box(x-3,y+7,z-2,x+3,y+12,z+2,DARK);
@@ -139,9 +158,10 @@ public final class TempleBlueprint {
         if(!broken)block(x+3,y+17,z,Blocks.QUARTZ_STAIRS);
         box(x-6,y+2,z+1,x-6,y+16,z+1,Blocks.POLISHED_BASALT.getDefaultState());
         box(x-6,y+16,z+1,x-6,y+20,z+1,SILVER);
-        if(broken){box(x+5,y+2,z+3,x+7,y+3,z+5,SILVER);block(x+6,y+4,z+4,Blocks.COBBLESTONE_SLAB);}
+        if(broken){footing(x+5,z+3,x+7,z+5,y+1);box(x+5,y+2,z+3,x+7,y+3,z+5,SILVER);block(x+6,y+4,z+4,Blocks.COBBLESTONE_SLAB);}
     }
     private void cherry(int x,int y,int z,int height){
+        footing(x,z,x,z,y-1);
         box(x,y,z,x,y+height,z,Blocks.CHERRY_LOG.getDefaultState());
         for(int s:new int[]{-1,1}){
             box(Math.min(x,x+s*2),y+height-2,z,Math.max(x,x+s*2),y+height-2,z,Blocks.CHERRY_LOG.getDefaultState());
@@ -151,7 +171,10 @@ public final class TempleBlueprint {
             if(dx*dx+dz*dz>19-dy*3 || (dx*17+dz*13+dy*7)%11==0)continue;
             put(x+dx,y+height+dy,z+dz,Blocks.CHERRY_LEAVES.getDefaultState().with(Properties.PERSISTENT,true));
         }
-        for(int i=0;i<8;i++)block(x+(i*7%9)-4,y,z+(i*5%9)-4,Blocks.PINK_PETALS);
+        for(int i=0;i<8;i++){
+            int px=x+(i*7%9)-4,pz=z+(i*5%9)-4;
+            if(footprint(px,pz))block(px,floor(pz)+1,pz,Blocks.PINK_PETALS);
+        }
     }
     private List<Column> build(){
         for(int x=MIN;x<=MAX;x++)for(int z=MIN;z<=MAX;z++)if(footprint(x,z)){
@@ -202,6 +225,7 @@ public final class TempleBlueprint {
             int xx=step<9?-17:-12,zz=step<9?-31-step:-39+(step-9),yy=15+step;
             for(int dx=0;dx<3;dx++){
                 box(xx+dx,yy+1,zz,xx+dx,yy+3,zz,Blocks.AIR.getDefaultState());
+                put(xx+dx,yy-1,zz,WOOD);
                 stairs(xx+dx,yy,zz,Blocks.DARK_OAK_STAIRS,step<9?Direction.NORTH:Direction.SOUTH);
             }
         }
@@ -211,6 +235,7 @@ public final class TempleBlueprint {
             int xx=step<8?9:3,zz=step<8?-33-step:-40+(step-8),yy=32+step;
             for(int dx=0;dx<3;dx++){
                 box(xx+dx,yy+1,zz,xx+dx,yy+3,zz,Blocks.AIR.getDefaultState());
+                put(xx+dx,yy-1,zz,WOOD);
                 stairs(xx+dx,yy,zz,Blocks.DARK_OAK_STAIRS,step<8?Direction.NORTH:Direction.SOUTH);
             }
         }
@@ -222,18 +247,20 @@ public final class TempleBlueprint {
         // Stairs into the main hall, central doorway and a future quest / sanctuary space.
         for(int z=-25;z<=-23;z++)for(int x=-5;x<=5;x++)stairs(x,14,z,Blocks.STONE_BRICK_STAIRS,Direction.NORTH);
         box(-3,15,-27,3,21,-26,Blocks.AIR.getDefaultState());
+        footing(-5,-26,5,-26,13);box(-5,14,-26,5,14,-26,WOOD);
         altar(0,15,-42,true);
         altar(-40,6,-1,false);altar(40,6,-1,false);
         hall(-34,14,-34,8,7,true);hall(34,14,-34,8,7,true);
         hall(-32,5,34,7,5,true);hall(32,5,34,7,5,true);
         // Garden paths, side courtyards, shrines and ruined colonnades.
         for(int side:new int[]{-1,1}){
-            for(int z=-17;z<=28;z++)for(int dx=25;dx<=27;dx++)put(side*dx,5,z,SILVER);
-            for(int z:new int[]{-17,-7,7,27})lamp(side*25,6,z);
+            for(int z=-17;z<=28;z++)for(int dx=25;dx<=27;dx++)put(side*dx,Math.max(5,floor(z)),z,SILVER);
+            for(int z:new int[]{-17,-7,7,27})lamp(side*25,Math.max(5,floor(z))+1,z);
             for(int z:new int[]{-12,11,29})cherry(side*43,floor(z)+1,z,5+(z&1));
             for(int z:new int[]{-47,-18,21})if(footprint(side*49,z))crystal(side*49,floor(z)+1,z,6);
             for(int z=0;z<5;z++){
                 int x=side*(34+z),zz=25+z;
+                footing(Math.min(x,x+side*2),zz,Math.max(x,x+side*2),zz+2,4);
                 box(Math.min(x,x+side*2),5,zz,Math.max(x,x+side*2),6,zz+2,Blocks.MOSSY_COBBLESTONE.getDefaultState());
                 if(z%2==0)block(x,7,zz,Blocks.COBBLESTONE_SLAB);
             }
@@ -242,13 +269,20 @@ public final class TempleBlueprint {
         }
         // Keep public routes clear through terrace rails and the central torii opening.
         box(-4,5,35,4,11,36,Blocks.AIR.getDefaultState());
-        // One floor-level boss socket, surrounded by the thunder inlay, no automatic boss spawning.
+        // Visible, level spawn seal: a nine-block-wide luminous circle, distinct from the large arena inlay.
+        for(int x=-5;x<=5;x++)for(int dz=-5;dz<=5;dz++){
+            double radius=Math.sqrt(x*x+dz*dz);
+            if(radius>=3.5 && radius<=4.6){put(x,4,5+dz,LIGHT);put(x,5,5+dz,GLASS);}
+            else if(radius<3.5)put(x,5,5+dz,radius<1.5?Blocks.BLUE_GLAZED_TERRACOTTA.getDefaultState():DARK);
+        }
+        for(int sign:new int[]{-1,1}){put(sign*5,5,5,LIGHT);put(0,5,5+sign*5,LIGHT);}
+        // Exact boss feet position is origin + (0.5, 6, 5.5).
         block(0,5,5,Blocks.CHISELED_POLISHED_BLACKSTONE);
         List<Column> result=new ArrayList<>();
         for(var entry:new TreeMap<>(cells).entrySet()){
             int x=entry.getKey()/120+MIN,z=entry.getKey()%120+MIN;
             List<Voxel> blocks=entry.getValue().entrySet().stream().map(e->new Voxel(e.getKey(),e.getValue())).toList();
-            boolean support=footprint(x,z) && (z<42 || z%8==2 || z==59);
+            boolean support=footings.contains(entry.getKey()) || footprint(x,z) && (z<42 || z%8==2 || z==59);
             result.add(new Column(x,z,floor(z),support,blocks));
         }
         return List.copyOf(result);

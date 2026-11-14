@@ -26,6 +26,7 @@ public final class ThunderTempleStructure extends Structure {
         TempleBlueprint.COLUMNS.size();
         TemplePlacement.init();
         TempleSearch.init();
+        TempleEncounter.init();
     }
     public ThunderTempleStructure(Config config){super(config);}
     @Override protected Optional<StructurePosition> getStructurePosition(Context context){

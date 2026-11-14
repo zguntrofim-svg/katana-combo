@@ -27,11 +27,15 @@ public final class TemplePlacement {
         Blocks.EMERALD_ORE,Blocks.DEEPSLATE_EMERALD_ORE,Blocks.LAPIS_ORE,Blocks.DEEPSLATE_LAPIS_ORE,
         Blocks.REDSTONE_ORE,Blocks.DEEPSLATE_REDSTONE_ORE,Blocks.DIAMOND_ORE,Blocks.DEEPSLATE_DIAMOND_ORE,
         Blocks.RAW_IRON_BLOCK,Blocks.RAW_COPPER_BLOCK);
+    private static final Set<Block> GENERATED=new HashSet<>();
+    static {for(var c:TempleBlueprint.COLUMNS)for(var v:c.blocks())GENERATED.add(v.state().getBlock());}
+    private static boolean restorable(BlockState state){return !state.hasBlockEntity() && (safe(state) || GENERATED.contains(state.getBlock()));}
     private static boolean safe(BlockState state){return !state.hasBlockEntity() && (state.isAir() || NATURAL.contains(state.getBlock()));}
     public static void init(){
         CommandRegistrationCallback.EVENT.register((dispatcher,access,environment)->dispatcher.register(literal("millida")
             .then(literal("temple").requires(source->source.hasPermissionLevel(2))
                 .then(literal("spawn").executes(context->start(context.getSource())))
+                .then(literal("repair").executes(context->repair(context.getSource())))
                 .then(literal("cancel").executes(context->{
                     var job=JOBS.remove(context.getSource().getWorld());
                     if(job==null)return TempleSearch.cancel(context.getSource());
@@ -60,21 +64,53 @@ public final class TemplePlacement {
         if(!world.getWorldBorder().contains(new BlockPos(x-60,64,z-60)) || !world.getWorldBorder().contains(new BlockPos(x+59,64,z+59))){
             source.sendError(Text.literal("Участок выходит за границу мира."));return 0;
         }
-        JOBS.put(world,new Job(world,source,x,z));
+        JOBS.put(world,new Job(world,source,x,z,null));
         source.sendFeedback(()->Text.literal("Обследую участок 120×120 к северу: "+x+", "+z+". До завершения обследования блоки не меняются."),false);
+        return 1;
+    }
+    private static int repair(ServerCommandSource source){
+        ServerWorld world=source.getWorld();
+        if(JOBS.containsKey(world)){source.sendError(Text.literal("Размещение уже идёт; сначала дождись окончания или отмени его."));return 0;}
+        BlockPos center=BlockPos.ofFloored(source.getPosition()).down();
+        if(!world.getBlockState(center).isOf(Blocks.CHISELED_POLISHED_BLACKSTONE)){
+            source.sendError(Text.literal("Встань на чёрную центральную плиту арены и повтори /millida temple repair."));return 0;
+        }
+        for(Direction d:Direction.Type.HORIZONTAL){
+            BlockPos sample=center.offset(d,14);
+            if(world.getChunkManager().getWorldChunk(sample.getX()>>4,sample.getZ()>>4)==null){
+                source.sendError(Text.literal("Дождись загрузки арены и повтори команду."));return 0;
+            }
+            var block=world.getBlockState(sample);
+            if(!block.isOf(Blocks.SEA_LANTERN) && !block.isOf(Blocks.CYAN_STAINED_GLASS)){
+                source.sendError(Text.literal("Не удалось распознать печать существующего храма. Блоки не изменены."));return 0;
+            }
+        }
+        BlockPos origin=center.add(0,-5,-5);
+        JOBS.put(world,new Job(world,source,origin.getX(),origin.getZ(),origin.getY()));
+        source.sendFeedback(()->Text.literal("Восстанавливаю храм на прежней высоте: опоры, крыши, светильники и круг призыва. Сундуки и неизвестные материалы сохраняются."),false);
         return 1;
     }
     private static final class Job {
         final ServerWorld world;final ServerCommandSource source;final int x,z;
-        final List<TempleBlueprint.Column> columns=TempleBlueprint.COLUMNS;
-        final int[] surfaces=new int[columns.size()];
+        final List<TempleBlueprint.Column> columns;
+        final int[] surfaces;final Integer fixedBase;
         final List<ChunkPos> chunks;final List<ChunkPos> tickets=new ArrayList<>();
         final Set<BlockBox> existingStructures=new HashSet<>();
         CompletableFuture<OptionalChunk<Chunk>> pending;
         int stage,chunkIndex,index,y=Integer.MIN_VALUE,voxelIndex,base,low=Integer.MAX_VALUE,high=Integer.MIN_VALUE;
-        int lastProgress=-1;boolean foundation;
-        Job(ServerWorld world,ServerCommandSource source,int x,int z){
-            this.world=world;this.source=source;this.x=x;this.z=z;
+        int lastProgress=-1,restoreY,protectedBlocks;boolean foundation;
+        Job(ServerWorld world,ServerCommandSource source,int x,int z,Integer fixedBase){
+            this.world=world;this.source=source;this.x=x;this.z=z;this.fixedBase=fixedBase;
+            if(fixedBase==null)columns=TempleBlueprint.COLUMNS;
+            else{
+                Map<Long,TempleBlueprint.Column> plan=new HashMap<>();
+                for(var c:TempleBlueprint.COLUMNS)plan.put(ChunkPos.toLong(c.x(),c.z()),c);
+                List<TempleBlueprint.Column> all=new ArrayList<>();
+                for(int dx=-60;dx<=59;dx++)for(int dz=-60;dz<=59;dz++)
+                    all.add(plan.getOrDefault(ChunkPos.toLong(dx,dz),new TempleBlueprint.Column(dx,dz,TempleBlueprint.floor(dz),false,List.of())));
+                columns=List.copyOf(all);
+            }
+            surfaces=new int[columns.size()];
             Set<ChunkPos> set=new LinkedHashSet<>();
             for(var c:columns)set.add(new ChunkPos((x+c.x())>>4,(z+c.z())>>4));chunks=List.copyOf(set);
         }
@@ -112,16 +148,17 @@ public final class TemplePlacement {
             while(budget-->0 && System.nanoTime()<deadline){
                 if(index>=columns.size()){
                     if(stage==1){
-                        base=high+2;
-                        if(base+TempleBlueprint.HEIGHT>=world.getTopY() || base-low>96)return fail("Рельеф слишком крутой или храм не помещается по высоте.");
+                        base=fixedBase==null?high+2:fixedBase;
+                        if(base+TempleBlueprint.HEIGHT>=world.getTopY() || fixedBase==null && base-low>96)return fail("Рельеф слишком крутой или храм не помещается по высоте.");
                         BlockBox affected=new BlockBox(x-60,Math.max(world.getBottomY(),low-4),z-60,x+59,base+TempleBlueprint.HEIGHT,z+59);
-                        if(existingStructures.stream().anyMatch(box->box.intersects(affected)))
+                        if(fixedBase==null && existingStructures.stream().anyMatch(box->box.intersects(affected)))
                             return fail("На участке есть структура, пересекающая объём строительства.");
                         stage=2;index=0;y=Integer.MIN_VALUE;continue;
                     }
-                    if(stage==2){stage=3;index=0;y=Integer.MIN_VALUE;message("Участок свободен. Строю храм небольшими порциями; не ставь здесь блоки до завершения.");continue;}
+                    if(stage==2){stage=3;index=0;y=Integer.MIN_VALUE;message(fixedBase==null?"Участок свободен. Строю храм небольшими порциями; не ставь здесь блоки до завершения.":"Участок загружен. Восстанавливаю храм небольшими порциями.");continue;}
+                    TempleEncounter.register(world,new BlockPos(x,base,z));
                     message("TEMPLE OF THE THUNDER SHOGUN готов. Вход: "+x+" "+(base+3)+" "+(z+58)
-                        +". Центр арены / место Райдзэна: "+x+" "+(base+6)+" "+(z+5)+". Босс автоматически не вызывается.");return true;
+                        +". Центр арены / место Райдзэна: "+x+" "+(base+6)+" "+(z+5)+". Райдзэн пробуждается при входе на территорию один раз. Сохранено чужих блоков: "+protectedBlocks+".");return true;
                 }
                 var column=columns.get(index);int wx=x+column.x(),wz=z+column.z();
                 if(stage==1){
@@ -132,18 +169,30 @@ public final class TemplePlacement {
                     if(y==Integer.MIN_VALUE)y=Math.max(world.getBottomY(),surfaces[index]-4);
                     if(y>=base+TempleBlueprint.HEIGHT){index++;y=Integer.MIN_VALUE;continue;}
                     BlockPos p=new BlockPos(wx,y++,wz);
-                    if(!safe(world.getBlockState(p)))return fail("Защита построек: неподходящий блок в "+p.toShortString()+". Ничего не размещено.");
+                    if(fixedBase==null && !safe(world.getBlockState(p)))return fail("Защита построек: неподходящий блок в "+p.toShortString()+". Ничего не размещено.");
                     continue;
                 }
                 int progress=index*100/columns.size()/10;
                 if(progress!=lastProgress){lastProgress=progress;message("Храм: "+(progress*10)+"%.");}
-                if(y==Integer.MIN_VALUE){y=base-1;foundation=column.support();voxelIndex=0;}
+                if(y==Integer.MIN_VALUE){y=base-1;foundation=column.support();voxelIndex=0;restoreY=0;}
                 if(foundation){
                     BlockPos p=new BlockPos(wx,y,wz);BlockState state=world.getBlockState(p);
                     if(state.isSolidBlock(world,p) && state.getFluidState().isEmpty()){foundation=false;continue;}
                     if(y<=world.getBottomY())return fail("Под опорой не найдена порода; размещение остановлено.");
-                    if(!safe(state))return fail("После обследования участок изменился в "+p.toShortString()+"; размещение остановлено без замены нового блока.");
+                    if(fixedBase!=null && !restorable(state)){protectedBlocks++;foundation=false;continue;}
+                    if(fixedBase==null && !safe(state))return fail("После обследования участок изменился в "+p.toShortString()+"; размещение остановлено без замены нового блока.");
                     world.setBlockState(p,TempleBlueprint.foundation(wx,y,wz),Block.NOTIFY_LISTENERS);y--;continue;
+                }
+                if(fixedBase!=null){
+                    if(restoreY>=TempleBlueprint.HEIGHT){index++;y=Integer.MIN_VALUE;continue;}
+                    int local=restoreY++;BlockPos p=new BlockPos(wx,base+local,wz);BlockState old=world.getBlockState(p),target=null;
+                    if(voxelIndex<column.blocks().size() && column.blocks().get(voxelIndex).y()==local)target=column.blocks().get(voxelIndex++).state();
+                    else if(local>column.floor() && GENERATED.contains(old.getBlock())
+                            && (TempleBlueprint.footprint(column.x(),column.z()) || !NATURAL.contains(old.getBlock())))target=Blocks.AIR.getDefaultState();
+                    if(target!=null && !old.equals(target)){
+                        if(restorable(old))world.setBlockState(p,target,Block.NOTIFY_LISTENERS);else protectedBlocks++;
+                    }
+                    continue;
                 }
                 if(voxelIndex>=column.blocks().size()){index++;y=Integer.MIN_VALUE;continue;}
                 var voxel=column.blocks().get(voxelIndex++);BlockPos p=new BlockPos(wx,base+voxel.y(),wz);
