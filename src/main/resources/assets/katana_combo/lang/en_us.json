@@ -1,4 +1,7 @@
 {
   "item.katana_combo.kurotsuki": "Kurotsuki — Abyss Moon",
-  "itemGroup.katana_combo.katanas": "Katanas"
+  "itemGroup.katana_combo.katanas": "Katanas",
+  "entity.katana_combo.raizen": "Raizen — The Storm Shogun",
+  "item.katana_combo.amakiri": "Amakiri — Heaven Splitter",
+  "item.katana_combo.raizen_spawn_egg": "Raizen Spawn Egg"
 }

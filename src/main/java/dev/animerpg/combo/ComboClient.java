@@ -23,6 +23,7 @@ public final class ComboClient implements ClientModInitializer {
     private static final String[] NAMES = {"horizontal", "reverse_diagonal", "overhead", "jump_counter"};
     @Override public void onInitializeClient() {
         KatanaModel.init();
+        net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(RaizenBoss.TYPE,RaizenRenderer::new);
         EffectClient.init();
         ImpactRenderer.init();
         DefenseClient.init();

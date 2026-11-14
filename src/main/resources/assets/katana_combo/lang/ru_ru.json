@@ -1,4 +1,7 @@
 {
   "item.katana_combo.kurotsuki": "Куроцуки — Луна Бездны",
-  "itemGroup.katana_combo.katanas": "Катаны"
+  "itemGroup.katana_combo.katanas": "Катаны",
+  "entity.katana_combo.raizen": "Райдзэн — Грозовой Сёгун",
+  "item.katana_combo.amakiri": "Амакири — Рассекающая Небеса",
+  "item.katana_combo.raizen_spawn_egg": "Призвать Райдзэна"
 }

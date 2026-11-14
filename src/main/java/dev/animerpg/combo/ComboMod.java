@@ -32,6 +32,7 @@ public final class ComboMod implements ModInitializer {
     }
     @Override public void onInitialize() {
         KatanaItems.init();
+        RaizenBoss.init();
         EffectNetwork.init();
         HitImpact.init();
         KatanaDefense.init();

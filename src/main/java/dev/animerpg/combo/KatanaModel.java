@@ -24,19 +24,24 @@ public final class KatanaModel implements BakedModel {
             if(model!=null && !(model instanceof KatanaModel)
                     && (Identifier.of("katana_combo","item/kurotsuki").equals(bake.resourceId())
                     || (bake.topLevelId()!=null && Identifier.of("katana_combo","kurotsuki").equals(bake.topLevelId().id()))))return new KatanaModel(model);
+            if(model!=null && !(model instanceof KatanaModel)
+                && (Identifier.of("katana_combo","item/amakiri").equals(bake.resourceId())
+                || (bake.topLevelId()!=null && Identifier.of("katana_combo","amakiri").equals(bake.topLevelId().id()))))
+                return new KatanaModel(model,"/assets/katana_combo/models/item/amakiri_mesh.json",false);
             return model;
         }));
     }
-    private KatanaModel(BakedModel base){
+    private KatanaModel(BakedModel base){this(base,"/assets/katana_combo/models/item/kurotsuki_mesh.json",true);}
+    private KatanaModel(BakedModel base,String resource,boolean reverseEdge){
         this.base=base;
         List<BakedQuad> result=new ArrayList<>();
-        try(var stream=KatanaModel.class.getResourceAsStream("/assets/katana_combo/models/item/kurotsuki_mesh.json")){
+        try(var stream=KatanaModel.class.getResourceAsStream(resource)){
             if(stream==null)throw new IllegalStateException("Missing Kurotsuki mesh");
             Face[] faces=new Gson().fromJson(new InputStreamReader(stream,StandardCharsets.UTF_8),Face[].class);
             for(Face face:faces){
                 // Half-turn around the canonical hilt-to-tip diagonal, not around the hand or camera.
                 // Keep points on that axis fixed: only the cutting edge / spine and front / back swap.
-                for(float[] point:face.p){float x=point[0];point[0]=point[1];point[1]=x;point[2]=16-point[2];}
+                if(reverseEdge)for(float[] point:face.p){float x=point[0];point[0]=point[1];point[1]=x;point[2]=16-point[2];}
                 result.add(bake(face,false));result.add(bake(face,true));
             }
         }catch(java.io.IOException e){throw new IllegalStateException("Unable to load Kurotsuki mesh",e);}
