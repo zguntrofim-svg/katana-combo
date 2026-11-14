@@ -9,6 +9,8 @@ import net.minecraft.client.render.entity.model.EntityModel;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Vector3f;
 import org.joml.Quaternionf;
+import org.joml.Matrix3f;
+import java.util.*;
 
 /** Single weapon rig, two explicit grip sockets, and two-bone arms driven from those sockets. */
 public final class RaizenModel extends EntityModel<RaizenBoss> {
@@ -17,7 +19,24 @@ public final class RaizenModel extends EntityModel<RaizenBoss> {
     private record File(int textureWidth,int textureHeight,Node[] nodes){}
     private final ModelPart root=load("raizen"),weapon=load("amakiri");
     private final ModelPart torso=root.getChild("torso"),head=root.getChild("head");
-    public static final Vector3f REAR_SOCKET=new Vector3f(0,10,0),FRONT_SOCKET=new Vector3f(0,25,0);
+    public static final Vector3f REAR_SOCKET=new Vector3f(0,RaizenMotion.REAR_GRIP,0),FRONT_SOCKET=new Vector3f(0,RaizenMotion.FRONT_GRIP,0);
+    private final Map<String,Bone> bones=new LinkedHashMap<>();
+    private final Bone weaponBone;
+    private final Map<String,Vector3f> shoulderAnchors=new HashMap<>();
+    private final Quaternionf shoulderFrame=new Quaternionf();
+    public RaizenModel(){
+        for(String name:new String[]{"right_upper","right_lower","right_hand","left_upper","left_lower","left_hand"})bones.put(name,new Bone(root.getChild(name)));
+        weaponBone=new Bone(weapon);
+    }
+    private static final class Bone {
+        final ModelPart part;Vector3f position=new Vector3f();Quaternionf rotation=new Quaternionf();float stretch=1;
+        Bone(ModelPart part){
+            this.part=part;part.pivotX=part.pivotY=part.pivotZ=0;part.pitch=part.yaw=part.roll=0;part.xScale=part.yScale=part.zScale=1;
+        }
+        void pose(Vector3f p,Quaternionf q,float scale){position.set(p);rotation.set(q).normalize();stretch=scale;}
+        void push(MatrixStack matrices){matrices.push();matrices.translate(position.x/16,position.y/16,position.z/16);matrices.multiply(rotation);matrices.scale(1,stretch,1);}
+        void render(MatrixStack matrices,VertexConsumer out,int light,int overlay,int color){push(matrices);part.render(matrices,out,light,overlay,color);matrices.pop();}
+    }
     private static ModelPart load(String name){
         try(var stream=RaizenModel.class.getResourceAsStream("/assets/katana_combo/models/entity/"+name+".json")){
             if(stream==null)throw new IllegalStateException("Missing boss model "+name);
@@ -43,19 +62,20 @@ public final class RaizenModel extends EntityModel<RaizenBoss> {
         torso.yaw=RaizenMotion.rad(v[5]);torso.pitch=RaizenMotion.rad(v[6]);torso.roll=RaizenMotion.rad(v[7])+(type==0?walk*moving*.025f:0);
         torso.pivotY=v[8]+breath+(type==0?Math.abs(walk)*moving*.40f:0);
         Quaternionf body=new Quaternionf().rotationZYX(torso.roll,torso.yaw,torso.pitch);
+        shoulderFrame.set(body);
         Vector3f neck=new Vector3f(0,-21,0).rotate(body).add(0,torso.pivotY,0);
         head.pivotX=neck.x;head.pivotY=neck.y;head.pivotZ=neck.z;
         head.yaw=headYaw*(float)Math.PI/180*.55f+torso.yaw*.2f;
         head.pitch=headPitch*(float)Math.PI/180*.35f+RaizenMotion.rad(v[10]);
         Vector3f axis=pose.axis().rotate(body);
         Vector3f center=pose.center().rotate(body).add(0,torso.pivotY,0);
-        Quaternionf weaponRotation=RaizenMotion.weaponRotation(type,age,axis,body);
-        Vector3f base=new Vector3f(center).fma(-17.5f,axis);
-        weapon.pivotX=base.x;weapon.pivotY=base.y;weapon.pivotZ=base.z;rotate(weapon,weaponRotation);
+        Quaternionf weaponRotation=RaizenMotion.weaponRotation(type,age,pose,body);
+        Vector3f base=new Vector3f(center).fma(-RaizenMotion.GRIP_CENTER,axis);
+        weaponBone.pose(base,weaponRotation,1);
         Vector3f rear=new Vector3f(REAR_SOCKET).rotate(weaponRotation).add(base);
         Vector3f front=new Vector3f(FRONT_SOCKET).rotate(weaponRotation).add(base);
-        arm("right",new Vector3f(-10,-15,0).rotate(body).add(0,torso.pivotY,0),rear,weaponRotation,-1);
-        arm("left",new Vector3f(10,-15,0).rotate(body).add(0,torso.pivotY,0),front,weaponRotation,1);
+        arm("right",new Vector3f(-10,-15,0).rotate(body).add(0,torso.pivotY,0),rear,weaponRotation,body,-1);
+        arm("left",new Vector3f(10,-15,0).rotate(body).add(0,torso.pivotY,0),front,weaponRotation,body,1);
         for(int i=0;i<2;i++){
             var leg=root.getChild(i==0?"right_leg":"left_leg");
             float step=(float)Math.sin(limb*.65f+(i==0?0:Math.PI));
@@ -67,32 +87,51 @@ public final class RaizenModel extends EntityModel<RaizenBoss> {
         for(int i=0;i<9;i++)cape.getChild("cape_strip_"+i).pitch=.10f+(float)Math.sin(progress*.09f+i*.55f)*.055f+Math.min(.25f,distance*.18f)+(type==RaizenMotion.DASH?.28f:0)+(type==RaizenMotion.TRANSITION?(float)Math.sin(progress*.45f+i)*.08f:0);
         weapon.getChild("tassel").roll=(float)Math.sin(progress*.12f)*.10f;
     }
-    private void arm(String side,Vector3f shoulder,Vector3f grip,Quaternionf weaponRotation,float sign){
-        Vector3f wrist=new Vector3f(0,0,2.2f).rotate(weaponRotation).add(grip);
-        Vector3f direction=new Vector3f(wrist).sub(shoulder);float d=direction.length();direction.div(Math.max(.001f,d));
-        float upper=12,lower=11;
-        float along=(d*d+upper*upper-lower*lower)/(2*Math.max(.001f,d));along=Math.max(0,Math.min(upper,along));
-        Vector3f pole=new Vector3f(sign,.1f,.75f);pole.fma(-pole.dot(direction),direction);
-        if(pole.lengthSquared()<.0001f)pole.set(0,0,1).fma(-direction.z,direction);
+    private void arm(String side,Vector3f shoulder,Vector3f grip,Quaternionf weaponRotation,Quaternionf body,float sign){
+        shoulderAnchors.put(side,new Vector3f(shoulder));
+        Vector3f shaft=new Vector3f(0,1,0).rotate(weaponRotation);
+        Vector3f back=new Vector3f(shoulder).sub(grip);back.fma(-back.dot(shaft),shaft);
+        if(back.lengthSquared()<.0001f){back=new Vector3f(0,0,1).rotate(body);back.fma(-back.dot(shaft),shaft);}
+        Vector3f wrist=new Vector3f(grip).fma(2.2f,back.normalize());
+        Vector3f direction=new Vector3f(wrist).sub(shoulder);float distance=Math.max(.001f,direction.length());direction.div(distance);
+        float upper=13.5f,lower=12.5f;
+        float along=(distance*distance+upper*upper-lower*lower)/(2*distance);along=Math.max(0,Math.min(upper,along));
+        Vector3f pole=new Vector3f(sign,.55f,-.4f).rotate(body);pole.fma(-pole.dot(direction),direction);
+        if(pole.lengthSquared()<.0001f){pole=new Vector3f(sign,0,0).rotate(body);pole.fma(-pole.dot(direction),direction);}
         pole.normalize();
         Vector3f elbow=new Vector3f(shoulder).fma(along,direction).fma((float)Math.sqrt(Math.max(0,upper*upper-along*along)),pole);
-        segment(root.getChild(side+"_upper"),shoulder,elbow,upper);
-        segment(root.getChild(side+"_lower"),elbow,wrist,lower);
-        ModelPart hand=root.getChild(side+"_hand");hand.pivotX=grip.x;hand.pivotY=grip.y;hand.pivotZ=grip.z;rotate(hand,weaponRotation);
+        Vector3f normal=new Vector3f(direction).cross(pole).normalize();
+        segment(bones.get(side+"_upper"),shoulder,elbow,12,normal);
+        segment(bones.get(side+"_lower"),elbow,wrist,11,normal);
+        bones.get(side+"_hand").pose(grip,weaponRotation,1);
     }
-    private static void segment(ModelPart part,Vector3f from,Vector3f to,float nominal){
-        Vector3f d=new Vector3f(to).sub(from);float length=d.length();
-        part.pivotX=from.x;part.pivotY=from.y;part.pivotZ=from.z;
-        rotate(part,new Quaternionf().rotationTo(new Vector3f(0,1,0),d.div(Math.max(.001f,length))));part.yScale=length/nominal;
+    private static void segment(Bone bone,Vector3f from,Vector3f to,float nominal,Vector3f planeNormal){
+        Vector3f y=new Vector3f(to).sub(from);float length=Math.max(.001f,y.length());y.div(length);
+        Vector3f x=new Vector3f(planeNormal).fma(-planeNormal.dot(y),y).normalize();
+        Vector3f z=new Vector3f(x).cross(y).normalize();
+        Quaternionf q=new Quaternionf().setFromNormalized(new Matrix3f().setColumn(0,x).setColumn(1,y).setColumn(2,z));
+        bone.pose(from,q,length/nominal);
     }
-    private static void rotate(ModelPart part,Quaternionf q){Vector3f e=q.getEulerAnglesZYX(new Vector3f());part.pitch=e.x;part.yaw=e.y;part.roll=e.z;}
-    @Override public void render(MatrixStack matrices,VertexConsumer vertices,int light,int overlay,int color){root.render(matrices,vertices,light,overlay,color);}
-    public void weapon(MatrixStack matrices,VertexConsumer vertices,int light){weapon.render(matrices,vertices,light,OverlayTexture.DEFAULT_UV);}
+    @Override public void render(MatrixStack matrices,VertexConsumer vertices,int light,int overlay,int color){
+        for(Bone bone:bones.values())bone.part.visible=false;
+        try{root.render(matrices,vertices,light,overlay,color);}finally{for(Bone bone:bones.values())bone.part.visible=true;}
+        for(String side:new String[]{"right","left"})for(int i=0;i<3;i++)root.getChild(side+"_upper").getChild(side+"_shoulder_"+i).visible=false;
+        try{for(Bone bone:bones.values())bone.render(matrices,vertices,light,overlay,color);}
+        finally{for(String side:new String[]{"right","left"})for(int i=0;i<3;i++)root.getChild(side+"_upper").getChild(side+"_shoulder_"+i).visible=true;}
+        // Heavy pauldrons follow the torso/shoulder socket, not the forearm's twist.
+        for(String side:new String[]{"right","left"}){
+            Vector3f p=shoulderAnchors.get(side);if(p==null)continue;
+            matrices.push();matrices.translate(p.x/16,p.y/16,p.z/16);matrices.multiply(shoulderFrame);
+            for(int i=0;i<3;i++)root.getChild(side+"_upper").getChild(side+"_shoulder_"+i).render(matrices,vertices,light,overlay,color);
+            matrices.pop();
+        }
+    }
+    public void weapon(MatrixStack matrices,VertexConsumer vertices,int light){weaponBone.render(matrices,vertices,light,OverlayTexture.DEFAULT_UV,-1);}
     public void glow(MatrixStack matrices,VertexConsumer vertices){
         matrices.push();head.rotate(matrices);head.getChild("eyes").render(matrices,vertices,15728880,OverlayTexture.DEFAULT_UV);matrices.pop();
         matrices.push();torso.rotate(matrices);torso.getChild("energy").render(matrices,vertices,15728880,OverlayTexture.DEFAULT_UV);matrices.pop();
     }
     public void weaponGlow(MatrixStack matrices,VertexConsumer vertices){
-        matrices.push();weapon.rotate(matrices);weapon.getChild("energy").render(matrices,vertices,15728880,OverlayTexture.DEFAULT_UV);matrices.pop();
+        weaponBone.push(matrices);weapon.getChild("energy").render(matrices,vertices,15728880,OverlayTexture.DEFAULT_UV);matrices.pop();
     }
 }

@@ -27,8 +27,8 @@ public final class RaizenEffects {
                 float fade=1-smooth((age-end)/5);
                 for(int i=0;i<36;i++){
                     float a=tail+(head-tail)*i/36,b=tail+(head-tail)*(i+1)/36;
-                    Vector3f ai=RaizenMotion.weaponPoint(type,a,35),ao=RaizenMotion.weaponPoint(type,a,46.5f);
-                    Vector3f bi=RaizenMotion.weaponPoint(type,b,35),bo=RaizenMotion.weaponPoint(type,b,46.5f);
+                    Vector3f ai=RaizenMotion.weaponPoint(type,a,RaizenMotion.TIP_DISTANCE-11),ao=RaizenMotion.weaponPoint(type,a,RaizenMotion.TIP_DISTANCE);
+                    Vector3f bi=RaizenMotion.weaponPoint(type,b,RaizenMotion.TIP_DISTANCE-11),bo=RaizenMotion.weaponPoint(type,b,RaizenMotion.TIP_DISTANCE);
                     float alpha=fade*(i+1)/36f;
                     quad(out,m,ai,bi,bo,ao,cyan,alpha*.38f);
                     line(out,m,ao,bo,.027f,white,alpha*.9f);
@@ -38,7 +38,7 @@ public final class RaizenEffects {
         }
         if(type==RaizenMotion.SLAM && age>=24 && age<37){
             float t=(age-24)/13;
-            Vector3f p=RaizenMotion.weaponPoint(RaizenMotion.SLAM,24,46.5f);p.y=1.485f;
+            Vector3f p=RaizenMotion.weaponPoint(RaizenMotion.SLAM,24,RaizenMotion.TIP_DISTANCE);p.y=1.485f;
             ring(out,m,p,.2f+t*2.8f,.035f,cyan,(1-t)*.85f);
             ring(out,m,p,.2f+t*2.8f,.10f,cyan,(1-t)*.15f);
             for(int i=0;i<12;i++){

@@ -8,6 +8,7 @@ import org.joml.Matrix3f;
 /** Shared animation timing; changing the weapon pose drives both grip sockets automatically. */
 public final class RaizenMotion {
     public static final int IDLE=0,HORIZONTAL=1,SLAM=2,DASH=3,TRANSITION=4;
+    public static final float REAR_GRIP=3,FRONT_GRIP=13,GRIP_CENTER=8,TIP_DISTANCE=55.05f;
     private record Clip(String name,int duration,int hit,float[][] frames){}
     private record File(int idlePeriod,Clip[] clips){}
     private static final File DATA;
@@ -25,38 +26,58 @@ public final class RaizenMotion {
     public static int duration(int type){return type>0&&type<=4?DATA.clips[type-1].duration:0;}
     public static int hit(int type){return type>0&&type<=4?DATA.clips[type-1].hit:-1;}
     public static Pose sample(int type,float age){
-        if(type<1 || type>4 || age<0)return new Pose(new float[]{-1,-6,-11,65,33,9,2,0,0,.21f,0});
+        if(type<1 || type>4 || age<0)return constrain(new float[]{-1,-6,-14,65,33,9,2,0,0,.21f,0},IDLE);
         Clip clip=DATA.clips[type-1];float[][] frames=clip.frames;
         int segment=0;while(segment<frames.length-2 && age>frames[segment+1][0])segment++;
         float[] a=frames[segment],b=frames[segment+1];float span=b[0]-a[0];
         float t=Math.max(0,Math.min(1,(age-a[0])/span));float[] v=new float[11];
-        for(int channel=0;channel<11;channel++){
-            int j=channel+1;
-            float m0=segment==0?0:(b[j]-frames[segment-1][j])/(b[0]-frames[segment-1][0]);
-            float m1=segment==frames.length-2?0:(frames[segment+2][j]-a[j])/(frames[segment+2][0]-a[0]);
-            v[channel]=(2*t*t*t-3*t*t+1)*a[j]+(t*t*t-2*t*t+t)*span*m0+(-2*t*t*t+3*t*t)*b[j]+(t*t*t-t*t)*span*m1;
+        // Bounded interpolation cannot overshoot a keyframe into the torso or wind an angle past its limits.
+        float eased=smooth(t);
+        for(int channel=0;channel<11;channel++)v[channel]=a[channel+1]+(b[channel+1]-a[channel+1])*eased;
+        return constrain(v,type);
+    }
+    private static Pose constrain(float[] v,int type){
+        Pose pose=new Pose(v);Vector3f axis=pose.axis();
+        float frontal=smooth((Math.abs(axis.z)-.70f)/.28f)*(1-smooth((Math.abs(axis.y)-.25f)/.30f));
+        v[1]+=(Math.min(v[1],-12)-v[1])*frontal;
+        for(int i=0;i<4;i++){
+            clearBody(v,axis);
+            if(type==SLAM){
+                Pose p=new Pose(v);Quaternionf body=p.body();
+                Vector3f tip=p.center().fma(TIP_DISTANCE,axis).rotate(body).add(0,v[8],0);
+                Vector3f correction=new Vector3f(0,-Math.max(0,tip.y-23.7f),0).rotate(body.conjugate());
+                v[0]+=correction.x;v[1]+=correction.y;v[2]+=correction.z;
+            }
         }
-        if(type==SLAM){
-            Pose raw=new Pose(v);Quaternionf body=raw.body();
-            Vector3f tip=raw.center().fma(46.5f,raw.axis()).rotate(body).add(0,v[8],0);
-            float pulse=smooth((age-19)/4)*(1-smooth((age-29)/8));
-            Vector3f correction=new Vector3f(0,-Math.max(0,tip.y-23.7f),-8*pulse).rotate(body.conjugate());
-            v[0]+=correction.x;v[1]+=correction.y;v[2]+=correction.z;
-        }
+        clearBody(v,axis);
         return new Pose(v);
     }
-    public static Quaternionf weaponRotation(int type,float age,Vector3f axis,Quaternionf body){
-        Vector3f guard=new Vector3f(.76f,-.54f,-.36f).normalize();
-        Vector3f normal=new Vector3f(0,0,1).rotate(new Quaternionf().rotationTo(new Vector3f(0,1,0),guard));
-        float blend=type==0?0:smooth(age/6)*(1-smooth((age-duration(type)+6)/6));
-        Vector3f cutPlane=type==HORIZONTAL?new Vector3f(0,-1,0):new Vector3f(1,0,0);
-        if(type==TRANSITION)blend=0;
-        normal.lerp(cutPlane,blend).rotate(body);
-        normal.fma(-normal.dot(axis),axis);
-        if(normal.lengthSquared()<.00001f)normal=new Vector3f(0,0,1).rotate(body).fma(-new Vector3f(0,0,1).rotate(body).dot(axis),axis);
-        normal.normalize();
-        Vector3f x=new Vector3f(axis).cross(normal).normalize();
-        return new Quaternionf().setFromNormalized(new Matrix3f().setColumn(0,x).setColumn(1,axis).setColumn(2,normal));
+    private static void clearBody(float[] center,Vector3f axis){
+        // Finite pole, including butt cap and blade; model-space proxies cover cuirass, waist and mask.
+        float[][] boxes={{-10,10,-19,9},{-7,7,-33,-14}};
+        for(float[] box:boxes){
+            float near=-GRIP_CENTER-2.3f,far=TIP_DISTANCE;
+            for(int component=0;component<2;component++){
+                float direction=component==0?axis.x:axis.y,origin=center[component];
+                float min=box[component*2],max=box[component*2+1];
+                if(Math.abs(direction)<.00001f){if(origin<min || origin>max){far=near-1;break;}}
+                else{
+                    float a=(min-origin)/direction,b=(max-origin)/direction;
+                    near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));
+                }
+            }
+            if(near<=far){
+                float nearestBack=Math.max(center[2]+near*axis.z,center[2]+far*axis.z);
+                center[2]-=Math.max(0,nearestBack+9.8f);
+            }
+        }
+    }
+    public static Quaternionf weaponRotation(int type,float age,Pose pose,Quaternionf body){
+        float roll=180;
+        if(type==SLAM)roll-=90*smooth(age/8)*(1-smooth((age-duration(type)+7)/7));
+        // Explicit yaw, elevation and shaft roll remain continuous through the overhead Y-axis singularity.
+        return new Quaternionf(body).rotateY(-rad(pose.v[3]))
+            .rotateX(-(float)Math.PI/2-rad(pose.v[4])).rotateY(rad(roll));
     }
     public static Vector3f weaponPoint(int type,float age,float distance){
         Pose p=sample(type,age);Quaternionf body=p.body();
